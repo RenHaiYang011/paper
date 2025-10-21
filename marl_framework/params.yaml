@@ -1,4 +1,4 @@
-environment:
+environment:  # 地图空间大小
   num_envs: 2
   seed: 3  # not 0, would mean same start position for every uav
   x_dim: 50 # [m]
@@ -33,9 +33,9 @@ experiment:
     budget: 14
     num_actions: 6
   uav:
-    max_v: 5 # [m/s]
-    max_a: 2 # [m/s]
-    sampling_time: 2 # [s]
+    max_v: 5                 # [m/s]
+    max_a: 2                 # [m/s]
+    sampling_time: 2         # [s]
     communication_range: 25  # [m]
     fix_range: True
     failure_rate: 0
@@ -53,6 +53,11 @@ experiment:
     use_eps: True
     class_weighting: [0, 1]
     reward_normalization: false
+  coverage_weight: 0.1   # 区域覆盖权重设置；信息应用+奖励多覆盖
+  distance_weight: 0.0   # 距离惩罚权重：每步按距离扣分（默认 0 表示禁用）
+  footprint_weight: 0.0  # 足迹重叠惩罚权重（默认 0 表示禁用）
+  collision_weight: 0.0  # 碰撞惩罚权重（默认 0 表示禁用）
+  collision_distance: 1.0  # 碰撞判定阈值（米），小于该距离视为碰撞
   baselines:
     lawnmower:
       trials: 50
@@ -75,10 +80,14 @@ evaluation:
     - "run_time"
 
 networks:
+  device: "cuda" # "cuda" or "cpu"
   type: "CNN"
-  data_passes: 5
-  batch_size: 60
-  batch_number: 5
+  # data_passes: 5
+  # batch_size: 60
+  # batch_number: 5
+  data_passes: 1
+  batch_size: 16
+  batch_number: 3
   copy_rate: 10     # full episodes
   gamma: 0.99
   lambda: 0.8

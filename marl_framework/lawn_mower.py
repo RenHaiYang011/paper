@@ -329,9 +329,10 @@ def save_mission_numbers(entropy_list, rmse_list, trials, budget):
     print(f"entropy_metrics: {entropy_metrics}")
     print(f"rmse_metrics: {rmse_metrics}")
 
-    with open(
-        "/home/penguin2/Documents/PAPER_PLOTS/coverage_8agents_f1.json", "w"
-    ) as fp:
+    import os
+    from marl_framework.constants import REPO_DIR
+    os.makedirs(os.path.join(REPO_DIR, "res"), exist_ok=True)
+    with open(os.path.join(REPO_DIR, "res", "coverage_8agents_f1.json"), "w") as fp:
         json.dump([entropy_metrics, rmse_metrics], fp)
         # json.dump(entropy_metrics, fp)
 

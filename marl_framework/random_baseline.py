@@ -5,6 +5,8 @@ import numpy as np
 import torch
 from matplotlib import pyplot as plt
 from torch.utils.tensorboard import SummaryWriter
+import os
+from marl_framework.constants import REPO_DIR
 
 import constants
 from agent.agent import Agent
@@ -143,8 +145,10 @@ def save_mission_numbers(entropy_list, rmse_list, trials, budget):
     print(f"entropy_metrics: {entropy_metrics}")
     print(f"rmse_metrics: {rmse_metrics}")
 
-    with open("/home/penguin2/Documents/PAPER_PLOTS/random_f1.json", "w") as fp:
-        json.dump([entropy_metrics, rmse_metrics], fp)
+
+    os.makedirs(os.path.join(REPO_DIR, "res"), exist_ok=True)
+    with open(os.path.join(REPO_DIR, "res", "random_f1.json"), "w") as fp:
+            json.dump([entropy_metrics, rmse_metrics], fp)
 
 
 def main():

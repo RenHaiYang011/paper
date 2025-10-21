@@ -15,6 +15,8 @@ from marl_framework.critic.network import CriticNetwork
 from actor.transformations import get_network_input as get_actor_input
 from critic.transformations import get_network_input as get_critic_input
 from utils.reward import get_global_reward
+from utils.utils import compute_coverage
+
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +24,8 @@ logger = logging.getLogger(__name__)
 class COMAWrapper:
     def __init__(self, params: Dict, writer: SummaryWriter):
         self.params = params
+        # keep writer to log additional metrics (coverage delta)
+        self.writer = writer
         self.mission_type = self.params["experiment"]["missions"]["type"]
         self.n_agents = self.params["experiment"]["missions"]["n_agents"]
         self.budget = params["experiment"]["constraints"]["budget"]
@@ -33,6 +37,7 @@ class COMAWrapper:
         self.critic_network = CriticNetwork(self.params)
         self.target_critic_network = copy.deepcopy(self.critic_network)
         self.critic_learner = CriticLearner(self.params, writer, self.critic_network)
+
 
     def build_observations(
         self, mapping, agents, num_episode, t, params, batch_memory, mode
@@ -82,6 +87,8 @@ class COMAWrapper:
         simulated_map,
         params,
         mode,
+        global_step: int = None,
+        prev_positions: List = None,
     ):
         next_maps = []
         next_positions = []
@@ -103,6 +110,7 @@ class COMAWrapper:
             next_maps.append(next_map)
             next_positions.append(next_position)
             try:
+        
                 actions.append(action.tolist()[0])
             except:
                 actions.append(action)
@@ -118,6 +126,7 @@ class COMAWrapper:
                     agent_id,
                     "global",
                 )
+                # correct argument ordering and pass coverage weight from params
                 done, relative_reward, absolute_reward = get_global_reward(
                     critic_map_knowledge,
                     update_simulation,
@@ -129,6 +138,13 @@ class COMAWrapper:
                     agent_id,
                     t,
                     self.budget,
+                    self.params["experiment"].get("coverage_weight", None),
+                    distance_weight=self.params["experiment"].get("distance_weight", 0.0),
+                    footprint_weight=self.params["experiment"].get("footprint_weight", 0.0),
+                    collision_weight=self.params["experiment"].get("collision_weight", 0.0),
+                    collision_distance=self.params["experiment"].get("collision_distance", 1.0),
+                    writer=self.writer,
+                    global_step=global_step,
                 )
                 batch_memory.insert(-1, agent_id, reward=relative_reward)
 
@@ -158,7 +174,39 @@ class COMAWrapper:
                 None,
                 t,
                 self.budget,
+                self.params["experiment"].get("coverage_weight", None),
+                distance_weight=self.params["experiment"].get("distance_weight", 0.0),
+                footprint_weight=self.params["experiment"].get("footprint_weight", 0.0),
+                collision_weight=self.params["experiment"].get("collision_weight", 0.0),
+                collision_distance=self.params["experiment"].get("collision_distance", 1.0),
+                prev_positions=prev_positions,
+                next_positions=next_positions,
+                writer=self.writer,
+                global_step=global_step,
             )
+
+            # log coverage delta and absolute coverage to TensorBoard if writer available
+            try:
+                coverage_before = compute_coverage(accumulated_map_knowledge)
+                coverage_after = compute_coverage(next_global_map)
+                coverage_delta = coverage_after - coverage_before
+                if hasattr(self, "writer") and self.writer is not None:
+                    try:
+                        # write absolute coverage and delta with global_step if provided
+                        if global_step is not None:
+                            self.writer.add_scalar(
+                                "Metrics/Coverage", float(coverage_after), global_step
+                            )
+                            self.writer.add_scalar(
+                                "Metrics/CoverageDelta", float(coverage_delta), global_step
+                            )
+                        else:
+                            self.writer.add_scalar("Metrics/Coverage", float(coverage_after))
+                            self.writer.add_scalar("Metrics/CoverageDelta", float(coverage_delta))
+                    except Exception:
+                        pass
+            except Exception:
+                pass
 
         if t == self.budget:
             done = True

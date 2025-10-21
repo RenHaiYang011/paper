@@ -1,6 +1,8 @@
 import matplotlib
 from matplotlib import cm
 import cv2
+import os
+import logging
 
 matplotlib.use("Agg")
 
@@ -8,6 +10,12 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import seaborn as sns
+from marl_framework.constants import REPO_DIR
+
+LOG_PLOTS_DIR = os.path.join(REPO_DIR, "log", "plots")
+RES_PLOTS_DIR = os.path.join(REPO_DIR, "res", "plots")
+os.makedirs(LOG_PLOTS_DIR, exist_ok=True)
+os.makedirs(RES_PLOTS_DIR, exist_ok=True)
 
 
 def plot_trajectories(
@@ -43,8 +51,9 @@ def plot_trajectories(
     #     plt.plot(y, x, color=colors[agent_id], linestyle="-", linewidth=10)
     #     plt.plot(y[0], x[0], color=colors[agent_id], marker="o", markersize=14)
     #
-    # plt.savefig(f"/home/penguin2/jonas-project/plots/coma_pathes_3d_{training_step_index}.png")
-    # # writer.add_figure(f"Agent trajectories", plt.gcf(), training_step_index, close=True)
+    # save example plot to project log directory
+    # plt.savefig(os.path.join(LOG_PLOTS_DIR, f"coma_pathes_3d_{training_step_index}.png"))
+    # writer.add_figure(f"Agent trajectories", plt.gcf(), training_step_index, close=True)
 
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
@@ -94,9 +103,31 @@ def plot_trajectories(
     ax.set_yticklabels([0, 10, 20, 30, 40, 50])
     ax.set_zticks([5, 10, 15])
 
-    # fig.savefig(f"/home/penguin2/jonas-project/plots/coma_pathes_3d_{training_step_index}.png")
-    # writer.add_figure(f"Agent trajectories", plt.gcf(), training_step_index, close=True)
+    # Save to disk (uncomment if you prefer files)
+    # fig.savefig(os.path.join(LOG_PLOTS_DIR, f"coma_pathes_3d_{training_step_index}.png"))
+    # Add to TensorBoard if writer supplied
+    # Try to add to TensorBoard (if writer provided). Ignore writer errors.
+    try:
+        writer.add_figure(f"Agent trajectories", fig, training_step_index, close=False)
+    except Exception:
+        pass
 
+    # Always save a copy to the project's log and res folders for later inspection
+    out_name = f"coma_pathes_3d_{training_step_index}.png"
+    out_path_log = os.path.join(LOG_PLOTS_DIR, out_name)
+    out_path_res = os.path.join(RES_PLOTS_DIR, out_name)
+    try:
+        fig.savefig(out_path_log, dpi=150)
+    except Exception:
+        # best effort, continue
+        pass
+    try:
+        fig.savefig(out_path_res, dpi=150)
+    except Exception:
+        pass
+
+    # Close the figure to free memory. If we added to tensorboard with close=False, close here.
+    plt.close(fig)
     # ax = fig.gca(projection='3d')
     #
     # for agent_id in range(n_agents):
@@ -110,8 +141,7 @@ def plot_trajectories(
     #
     #     ax.plot(y, x, z, color=colors[agent_id], linestyle="-", linewidth=10)
 
-    # ax.savefig(
-    #     f"/home/penguin2/jonas-project/plots/ig_pathes_3d_{training_step_index}.png")
+    # ax.savefig(os.path.join(LOG_PLOTS_DIR, f"ig_pathes_3d_{training_step_index}.png"))
     # writer.add_figure(f"Agent trajectories - 3D", ax.gcf(), training_step_index, close=True)
 
 
@@ -120,7 +150,5 @@ def plot_performance(budget, entropies):
     y = entropies
 
     plt.plot(x, y)
-    np.savetxt("/home/penguin2/jonas-project/plots/learned_new.txt", y, delimiter=",")
-    plt.savefig(
-        f"/home/penguin2/jonas-project/plots/lawnmower_comparison_uncertainty_reduction.png"
-    )
+    np.savetxt(os.path.join(RES_PLOTS_DIR, "learned_new.txt"), y, delimiter=",")
+    plt.savefig(os.path.join(RES_PLOTS_DIR, "lawnmower_comparison_uncertainty_reduction.png"))

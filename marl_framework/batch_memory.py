@@ -3,6 +3,7 @@ from typing import Dict, List
 
 import numpy as np
 import torch
+import constants
 
 from utils.utils import TransitionCOMA
 
@@ -120,19 +121,21 @@ class BatchMemory:
     def build_td_targets(self, target_critic_network):
         for agent_id in range(self.n_agents):
             for t in range(len(self.transitions[agent_id])):
-                sum_n_step_returns = torch.tensor([0.0])
+                # Use 0-D scalar tensors to avoid broadcast shape issues in in-place ops
+                sum_n_step_returns = torch.tensor(0.0, device=constants.DEVICE)
                 for n in range(1, len(self.transitions[agent_id]) - t + 1):
                     leave = False
-                    n_step_return = 0
-                    discounted_return = torch.tensor([0.0])
+                    n_step_return = torch.tensor(0.0, device=constants.DEVICE)
+                    discounted_return = torch.tensor(0.0, device=constants.DEVICE)
                     for l in range(0, n):
+                        reward = torch.tensor(
+                            self.get(t + l, agent_id, "reward"),
+                            device=constants.DEVICE,
+                            dtype=torch.float,
+                        )
                         if (not self.get(t + l - 1, agent_id, "done")) or (t + l == 0):
-                            n_step_return += np.power(self.gamma, l) * self.get(
-                                t + l, agent_id, "reward"
-                            )
-                            discounted_return += np.power(self.gamma, l) * self.get(
-                                t + l, agent_id, "reward"
-                            )
+                            n_step_return += np.power(self.gamma, l) * reward
+                            discounted_return += np.power(self.gamma, l) * reward
                         else:
                             leave = True
                             break
@@ -148,11 +151,15 @@ class BatchMemory:
                         ):
                             with torch.no_grad():
                                 target_q_values, _ = target_critic_network.forward(
-                                    self.get(t + n, agent_id, "state")
+                                    self.get(t + n, agent_id, "state").to(constants.DEVICE)
                                 )
-                                target_q_value = target_q_values[
-                                    self.get(t + n, agent_id, "action").to("cpu")
-                                ]
+                                # Ensure action index is an integer, then pick scalar q-value
+                                action_idx = self.get(t + n, agent_id, "action")
+                                if torch.is_tensor(action_idx):
+                                    action_idx = int(action_idx.to("cpu").item())
+                                else:
+                                    action_idx = int(action_idx)
+                                target_q_value = target_q_values[action_idx].squeeze()
 
                             n_step_return += np.power(self.gamma, n) * target_q_value
 

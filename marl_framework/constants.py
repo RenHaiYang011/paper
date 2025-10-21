@@ -1,7 +1,10 @@
 import logging
 import os
+import torch
 
 logger = logging.getLogger(__name__)
+
+DEVICE = torch.device("cpu")
 
 
 def load_from_env(env_var_name: str, data_type: callable, default=None):
@@ -28,7 +31,7 @@ PLOT_LEGEND_FONT_SIZE = 20
 PLOT_TICKS_SIZE = 20
 PLOT_LINE_WIDTH = 5
 
-REPO_DIR = "/home/penguin2/jonas-project/marl_framework/"
+REPO_DIR = os.path.dirname(os.path.abspath(__file__)) + os.sep
 # REPO_DIR = "/home/julius/Dokumente/Uni/Bonn/multi_agent_rl/marl_framework/"
 # REPO_DIR = "/home/masha/jonas/multi_agent_rl/marl_framework/"
 
@@ -44,7 +47,7 @@ TRAIN_DATA_DIR = os.path.join(REPO_DIR, TRAIN_DATA_DIR)
 EXPERIMENTS_FOLDER = load_from_env("EXPERIMENT_FILE_PATH", str, "results")
 EXPERIMENTS_FOLDER = os.path.join(REPO_DIR, EXPERIMENTS_FOLDER)
 
-LOG_DIR = load_from_env("LOG_DIR", str, "logs")
+LOG_DIR = load_from_env("LOG_DIR", str, "log")
 LOG_DIR = os.path.join(REPO_DIR, LOG_DIR)
 LOG_LEVEL = logging.DEBUG
 

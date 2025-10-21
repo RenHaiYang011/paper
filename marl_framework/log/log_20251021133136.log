@@ -1,0 +1,17 @@
+2025-10-21 13:31:36,399 - constants - INFO - 
+-------------------------------------- LOG ENV-VARIABLES --------------------------------------
+
+2025-10-21 13:31:36,399 - constants - INFO - REPO_DIR: /home/renhaiyang/paper_v2/ipp-marl/marl_framework/ | type: <class 'str'>
+2025-10-21 13:31:36,400 - constants - INFO - CONFIG_FILE_PATH: /home/renhaiyang/paper_v2/ipp-marl/marl_framework/params.yaml | type: <class 'str'>
+2025-10-21 13:31:36,400 - constants - INFO - CHECKPOINTS_DIR: /home/renhaiyang/paper_v2/ipp-marl/marl_framework/checkpoints | type: <class 'str'>
+2025-10-21 13:31:36,400 - constants - INFO - TRAIN_DATA_DIR: /home/renhaiyang/paper_v2/ipp-marl/marl_framework/generated_train_data | type: <class 'str'>
+2025-10-21 13:31:36,400 - constants - INFO - EXPERIMENTS_FOLDER: /home/renhaiyang/paper_v2/ipp-marl/marl_framework/results | type: <class 'str'>
+2025-10-21 13:31:36,400 - constants - INFO - LOG_DIR: /home/renhaiyang/paper_v2/ipp-marl/marl_framework/log | type: <class 'str'>
+2025-10-21 13:31:36,400 - params - INFO - 
+----------------------------------- USED HYPERPARAMETERS -----------------------------------
+
+2025-10-21 13:31:36,408 - params - INFO - {'environment': {'num_envs': 2, 'seed': 3, 'x_dim': 50, 'y_dim': 50}, 'sensor': {'type': 'rgb_camera', 'field_of_view': {'angle_x': 60, 'angle_y': 60}, 'pixel': {'number_x': 57, 'number_y': 57}, 'encoding': 'rgb8', 'model': {'type': 'altitude_dependent', 'coeff_a': 0.05, 'coeff_b': 0.2}, 'simulation': {'type': 'random_field', 'cluster_radius': 5}}, 'mapping': {'prior': 0.5}, 'experiment': {'title': 'test_experiment', 'constraints': {'spacing': 5, 'min_altitude': 5, 'max_altitude': 15, 'budget': 14, 'num_actions': 6}, 'uav': {'max_v': 5, 'max_a': 2, 'sampling_time': 2, 'communication_range': 25, 'fix_range': True, 'failure_rate': 0}, 'missions': {'type': 'COMA', 'mission_mode': 'training', 'n_episodes': 1500, 'patience': 100, 'n_agents': 4, 'action_space': 'larger', 'planning_uncertainty': 'SE', 'eps_max': 0.5, 'eps_min': 0.02, 'eps_anneal_phase': 10000, 'use_eps': True, 'class_weighting': [0, 1], 'reward_normalization': False}, 'coverage_weight': 0.1, 'distance_weight': 0.0, 'footprint_weight': 0.0, 'collision_weight': 0.0, 'collision_distance': 1.0, 'baselines': {'lawnmower': {'trials': 50, 'altitude': 5}, 'random': {'n_episodes': 50}, 'information_gain': {'trials': 50, 'communication': True}}}, 'evaluation': {'repetitions': 1, 'metrics': ['num_waypoints', 'paths', 'rmse', 'wrmse', 'mll', 'wmll', 'run_time']}, 'networks': {'device': 'cuda', 'type': 'CNN', 'data_passes': 1, 'batch_size': 16, 'batch_number': 3, 'copy_rate': 10, 'gamma': 0.99, 'lambda': 0.8, 'actor': {'hidden_dim': 128, 'learning_rate': 1e-05, 'momentum': 0.9, 'gradient_norm': 10}, 'critic': {'target_update_mode': 'hard', 'tau': 0.01, 'update_mode': 'random_batches', 'synchronization': 'no', 'fc1_dim': 64, 'learning_rate': 0.0001, 'momentum': 0.9, 'gradient_norm': 10}}, 'classification': {'n_episodes': 300, 'data_split': [0.4, 0.4, 0.2], 'number_epochs': 100, 'batch_size': 50}}
+2025-10-21 13:31:36,570 - root - INFO - Using GPU
+2025-10-21 13:31:36,571 - root - INFO - 
+-------------------------------------- START PIPELINE --------------------------------------
+

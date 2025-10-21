@@ -107,8 +107,9 @@ class Mapping:
         return self.apply_update(map_section, measurement, mode)
 
     def apply_update(self, x, y, mode):
-        x[0.9999 < x] = 0.9999
-        x[0.0001 > x] = 0.0001
+        # Clamp to open interval (0,1) to avoid log/divide-by-zero
+        x = np.clip(x, 1e-4, 1 - 1e-4)
+        y = np.clip(y, 1e-4, 1 - 1e-4)
         l_x = np.log(x / (1 - x))
         l_y = np.log(y / (1 - y))
         l_xy = l_x + l_y

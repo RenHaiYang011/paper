@@ -2,7 +2,8 @@ import copy
 import json
 import time
 from typing import Dict
-
+import os
+from marl_framework.constants import REPO_DIR
 import numpy as np
 from matplotlib import pyplot as plt
 from torch.utils.tensorboard import SummaryWriter
@@ -183,6 +184,13 @@ class IG_baseline:
                 None,
                 t,
                 self.budget,
+                self.params["experiment"].get("coverage_weight", None),
+                distance_weight=self.params["experiment"].get("distance_weight", 0.0),
+                footprint_weight=self.params["experiment"].get("footprint_weight", 0.0),
+                collision_weight=self.params["experiment"].get("collision_weight", 0.0),
+                collision_distance=self.params["experiment"].get("collision_distance", 1.0),
+                writer=self.writer,
+                global_step=None,
             )
 
             relative_rewards.append(relative_reward)
@@ -338,9 +346,11 @@ def save_mission_numbers(entropy_list, rmse_list, trials, budget):
     print(f"entropy_metrics: {entropy_metrics}")
     print(f"rmse_metrics: {rmse_metrics}")
 
-    with open("/home/penguin2/Documents/PAPER_PLOTS/ig_zero_f1.json", "w") as fp:
+
+    os.makedirs(os.path.join(REPO_DIR, "res"), exist_ok=True)
+    with open(os.path.join(REPO_DIR, "res", "ig_zero_f1.json"), "w") as fp:
         json.dump([entropy_metrics, rmse_metrics], fp)
-        # json.dump(entropy_metrics, fp)
+    # json.dump(entropy_metrics, fp)
 
 
 def main():

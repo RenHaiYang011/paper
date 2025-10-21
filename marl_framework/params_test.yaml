@@ -1,0 +1,110 @@
+environment:
+  num_envs: 1
+  seed: 42
+  x_dim: 20
+  y_dim: 20
+
+sensor:
+  type: "rgb_camera"
+  field_of_view:
+    angle_x: 60
+    angle_y: 60
+  pixel:
+    number_x: 30
+    number_y: 30
+  encoding: "rgb8"
+  model:
+    type: "altitude_dependent"
+    coeff_a: 0.05
+    coeff_b: 0.2
+  simulation:
+    type: "random_field"
+    cluster_radius: 3
+
+mapping:
+  prior: 0.5
+
+experiment:
+  title: "smoke_test"
+  constraints:
+    spacing: 5
+    min_altitude: 5
+    max_altitude: 10
+    budget: 6
+    num_actions: 6
+  uav:
+    max_v: 3
+    max_a: 1
+    sampling_time: 2
+    communication_range: 25
+    fix_range: True
+    failure_rate: 0
+  missions:
+    type: "COMA"
+    mission_mode: "training"
+    n_episodes: 8
+    patience: 10
+    n_agents: 2
+    action_space: "reduced"
+    planning_uncertainty: "SE"
+    eps_max: 0.5
+    eps_min: 0.02
+    eps_anneal_phase: 100
+    use_eps: True
+    class_weighting: [0, 1]
+    reward_normalization: false
+  coverage_weight: 0.05
+  distance_weight: 0.0
+  footprint_weight: 0.0
+  collision_weight: 0.0
+  collision_distance: 1.0 # 碰撞阈值
+  baselines:
+    lawnmower:
+      trials: 10
+      altitude: 5
+    random:
+      n_episodes: 10
+    information_gain:
+      trials: 10
+      communication: true
+
+evaluation:
+  repetitions: 1
+  metrics:
+    - "num_waypoints"
+    - "paths"
+    - "rmse"
+    - "wrmse"
+    - "mll"
+    - "wmll"
+    - "run_time"
+
+networks:
+  device: "cuda"
+  type: "CNN"
+  data_passes: 1
+  batch_size: 8
+  batch_number: 2
+  copy_rate: 5
+  gamma: 0.99
+  lambda: 0.8
+  actor:
+    hidden_dim: 64
+    learning_rate: 1e-4
+    momentum: 0.9
+    gradient_norm: 5
+  critic:
+    target_update_mode: "hard"
+    tau: 0.01
+    update_mode: "random_batches"
+    synchronization: "no"
+    fc1_dim: 32
+    learning_rate: 1e-4
+    momentum: 0.9
+    gradient_norm: 5
+
+classification:
+  n_episodes: 50
+  data_split: [0.4, 0.4, 0.2]
+  number_epochs: 10
+  batch_size: 20

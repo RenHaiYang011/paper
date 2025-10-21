@@ -2,6 +2,7 @@ import logging
 from typing import Dict
 import torch
 from torch import nn
+import constants
 
 
 logger = logging.getLogger(__name__)
@@ -27,7 +28,6 @@ class ActorNetwork(nn.Module):
         self.fc2 = nn.Linear(256, 256)
         self.fc3 = nn.Linear(256, self.n_actions)
 
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.softmax = nn.Softmax(dim=1)
         self.log_softmax = nn.LogSoftmax(dim=1)
         self.hidden_states = [[]] * self.n_agents
@@ -47,8 +47,8 @@ class ActorNetwork(nn.Module):
 
         input_state = torch.unsqueeze(
             batch_memory.get(-1, agent_id, "observation"), 0
-        ).to(self.device)
-        action_mask_1d = torch.tensor(action_mask_1d).to(self.device)
+        ).to(constants.DEVICE)
+        action_mask_1d = torch.tensor(action_mask_1d).to(constants.DEVICE)
 
         if num_episode > self.eps_anneal_phase:
             eps = self.eps_min

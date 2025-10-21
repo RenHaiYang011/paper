@@ -32,6 +32,9 @@ class ActorLearner:
         self.optimizer = torch.optim.Adam(self.actor.parameters(), lr=self.lr)
         self.optimizer.zero_grad()
         self.kl_loss = nn.KLDivLoss()
+        # AMP setup
+        self.use_amp = (self.device.type == "cuda")
+        self.scaler = torch.cuda.amp.GradScaler(enabled=self.use_amp)
 
     def learn(self, batches, q_values, eps):
         advantages = []
@@ -49,9 +52,10 @@ class ActorLearner:
                 batch_actions.append(batch_idx.action)
                 batch_masks.append(batch_idx.mask)
 
-            batch_probs, batch_hidden_states = self.actor.forward(
-                torch.stack(batch_observations).squeeze().to(self.device), eps
-            )
+            with torch.cuda.amp.autocast(enabled=self.use_amp):
+                batch_probs, batch_hidden_states = self.actor.forward(
+                    torch.stack(batch_observations).squeeze().to(self.device), eps
+                )
             batch_log_probs = torch.log(batch_probs)
             with torch.no_grad():
                 batch_probs = batch_probs * torch.stack(batch_masks)
@@ -95,14 +99,21 @@ class ActorLearner:
             ).mean()
             losses.append(loss)
 
-            self.optimizer.zero_grad()
-            loss.backward()
-            # clip_gradients(self.actor, self.gradient_norm)
-            self.optimizer.step()
+            self.optimizer.zero_grad(set_to_none=True)
+            if self.use_amp:
+                self.scaler.scale(loss).backward()
+                # clip_gradients(self.actor, self.gradient_norm)
+                self.scaler.step(self.optimizer)
+                self.scaler.update()
+            else:
+                loss.backward()
+                # clip_gradients(self.actor, self.gradient_norm)
+                self.optimizer.step()
 
-        kl_divergence = self.calculate_kl_divergence(
-            batches, torch.stack(log_probs_all), eps
-        )
+        with torch.cuda.amp.autocast(enabled=self.use_amp):
+            kl_divergence = self.calculate_kl_divergence(
+                batches, torch.stack(log_probs_all), eps
+            )
 
         conv1_grad_norm = 0
         conv2_grad_norm = 0

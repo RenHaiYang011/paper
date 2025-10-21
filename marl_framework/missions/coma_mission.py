@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 from typing import Dict
 
 import numpy as np
@@ -44,6 +45,20 @@ class COMAMission(Mission):
         self.collision_returns = []
         self.utility_returns = []
         self.mode = "train"
+        
+        # Logging/plotting frequency (throttle heavy ops)
+        logging_cfg = self.params.get("logging", {})
+        self.figure_interval = int(logging_cfg.get("figure_interval", 20))
+        self.histogram_interval = int(logging_cfg.get("histogram_interval", 200))
+        
+        # For ETA calculation
+        self.total_training_steps = int(
+                self.num_episodes
+                * (self.batch_size * self.batch_number)
+                / ((self.budget + 1) * self.n_agents)
+            )
+        self.start_time = time.time()
+        self.last_time = self.start_time
 
     def execute(self):
 
@@ -56,12 +71,7 @@ class COMAMission(Mission):
 
         for episode_idx in range(
             1,
-            int(
-                self.num_episodes
-                * (self.batch_size * self.batch_number)
-                / ((self.budget + 1) * self.n_agents)
-            )
-            + 1,
+            self.total_training_steps + 1,
         ):
 
             episode = EpisodeGenerator(
@@ -78,7 +88,9 @@ class COMAMission(Mission):
                 eps,
                 agent_actions,
                 agent_altitudes,
-            ) = episode.execute(episode_idx, batch_memory, self.coma_wrapper, self.mode)
+            ) = episode.execute(
+                episode_idx, batch_memory, self.coma_wrapper, self.mode, self.training_step_idx
+            )
 
             episode_returns.append(episode_return)
             episode_reward_list.append(episode_rewards)
@@ -99,6 +111,22 @@ class COMAMission(Mission):
                     if data_pass == 0:
                         self.training_step_idx += 1
                         self.environment_step_idx += batch_memory.size()
+                        
+                        current_time = time.time()
+                        step_time = current_time - self.last_time
+                        self.last_time = current_time
+                        
+                        elapsed_time = current_time - self.start_time
+                        avg_step_time = elapsed_time / self.training_step_idx
+                        remaining_steps = self.total_training_steps - self.training_step_idx
+                        eta_seconds = remaining_steps * avg_step_time
+                        
+                        eta_h = int(eta_seconds // 3600)
+                        eta_m = int((eta_seconds % 3600) // 60)
+                        eta_s = int(eta_seconds % 60)
+                        
+                        print(f"Training step: {self.training_step_idx}/{self.total_training_steps}, Step Time: {step_time:.2f}s, ETA: {eta_h:02d}:{eta_m:02d}:{eta_s:02d}")
+                        
                         logger.info(f"Training step: {self.training_step_idx}")
                         logger.info(f"Environment step: {self.environment_step_idx}")
                         self.add_to_tensorboard(
@@ -135,7 +163,11 @@ class COMAMission(Mission):
                             agent_actions,
                             agent_altitudes,
                         ) = episode.execute(
-                            episode_idx + i, batch_memory, self.coma_wrapper, self.mode
+                            episode_idx + i,
+                            batch_memory,
+                            self.coma_wrapper,
+                            self.mode,
+                            self.training_step_idx,
                         )
                         if i == 0:
                             plot_trajectories(
@@ -171,6 +203,62 @@ class COMAMission(Mission):
 
         return self.max_mean_episode_return
 
+    def _safe_add_histogram(self, tag: str, values, step: int):
+        """Safely add histogram to TensorBoard, ensuring numeric dtype and robustness.
+        - Flattens and casts to float64
+        - Filters non-finite values
+        - Skips empty arrays
+        - Falls back gracefully on TensorBoard TypeErrors
+        """
+        # First attempt: fast path using numpy conversion
+        try:
+            vals = np.asarray(values, dtype=np.float64).reshape(-1)
+            # Filter out non-finite values
+            vals = vals[np.isfinite(vals)]
+        except Exception:
+            # Fallback: iterative per-element conversion to float
+            vals_list = []
+            dropped = 0
+            try:
+                for i, v in enumerate(np.ravel(values)):
+                    try:
+                        fv = float(v)
+                        if np.isfinite(fv):
+                            vals_list.append(fv)
+                    except Exception:
+                        dropped += 1
+                        if dropped <= 5:
+                            logger.debug(f"Dropping non-numeric histogram element for {tag}: index={i}, value={repr(v)[:200]}")
+                            # also append to a persistent log for offline inspection
+                            try:
+                                from marl_framework import constants
+
+                                os.makedirs(constants.LOG_DIR, exist_ok=True)
+                                bad_log = os.path.join(constants.LOG_DIR, 'bad_hist_elems.log')
+                                with open(bad_log, 'a') as bf:
+                                    bf.write(f"{tag}\tindex={i}\tvalue={repr(v)[:400]}\n")
+                            except Exception:
+                                pass
+                if len(vals_list) == 0:
+                    return
+                vals = np.asarray(vals_list, dtype=np.float64)
+            except Exception as e:
+                logger.warning(f"Skip histogram '{tag}' due to preprocessing error: {e}")
+                return
+
+        if vals.size == 0:
+            return
+
+        # Prefer a fixed small bin count to avoid heavy work
+        try:
+            self.writer.add_histogram(tag, vals, step, bins=50)
+        except TypeError as e:
+            # Some torch TB + numpy versions have a bug path; try alternative bins
+            try:
+                self.writer.add_histogram(tag, vals, step, bins='tensorflow')
+            except Exception:
+                logger.warning(f"Skip histogram '{tag}' due to writer error: {e}")
+
     def add_to_tensorboard(
         self,
         chosen_actions,
@@ -188,22 +276,26 @@ class COMAMission(Mission):
         chosen_altitudes = [item for sublist in chosen_altitudes for item in sublist]
         chosen_altitudes = [item for sublist in chosen_altitudes for item in sublist]
 
-        action_counts = [chosen_actions.count(i) for i in range(self.n_actions)]
-        altitude_counts = [chosen_altitudes.count(i) for i in [5, 10, 15]]
+        # Throttle heavy plotting: only every figure_interval steps
+        if self.training_step_idx % self.figure_interval == 0:
+            action_counts = [chosen_actions.count(i) for i in range(self.n_actions)]
+            altitude_counts = [chosen_altitudes.count(i) for i in [5, 10, 15]]
 
-        plt.figure()
-        fig_ = sns.barplot(
-            x=list(range(self.n_actions)), y=action_counts, color="blue"
-        ).get_figure()
-        self.writer.add_figure(
-            f"Sampled_actions_{self.mode}", fig_, self.training_step_idx, close=True
-        )
+            plt.figure()
+            fig_ = sns.barplot(
+                x=list(range(self.n_actions)), y=action_counts, color="blue"
+            ).get_figure()
+            self.writer.add_figure(
+                f"Sampled_actions_{self.mode}", fig_, self.training_step_idx, close=True
+            )
 
-        plt.figure()
-        fig_ = sns.barplot(x=[5, 10, 15], y=altitude_counts, color="blue").get_figure()
-        self.writer.add_figure(
-            f"Altitudes_{self.mode}", fig_, self.training_step_idx, close=True
-        )
+            plt.figure()
+            fig_ = sns.barplot(
+                x=[float(i) for i in [5, 10, 15]], y=altitude_counts, color="blue"
+            ).get_figure()
+            self.writer.add_figure(
+                f"Altitudes_{self.mode}", fig_, self.training_step_idx, close=True
+            )
 
         self.writer.add_scalar(
             f"{self.mode}Return/Episode/mean",
@@ -345,20 +437,19 @@ class COMAMission(Mission):
                 self.training_step_idx,
             )
 
-            if self.training_step_idx % 100 == 0:
+            # Throttle parameter histograms as they're expensive
+            if self.training_step_idx % self.histogram_interval == 0:
                 for tag, params in self.coma_wrapper.critic_network.named_parameters():
                     if params.grad is not None:
-                        self.writer.add_histogram(
-                            f"Critic/Parameters/{tag}",
-                            params.data.cpu().numpy(),
-                            self.training_step_idx,
+                        vals = params.data.detach().flatten().cpu().numpy()
+                        self._safe_add_histogram(
+                            f"Critic/Parameters/{tag}", vals, self.training_step_idx
                         )
                 for tag, params in self.coma_wrapper.actor_network.named_parameters():
                     if params.grad is not None:
-                        self.writer.add_histogram(
-                            f"Actor/Parameters/{tag}",
-                            params.data.cpu().numpy(),
-                            self.training_step_idx,
+                        vals = params.data.detach().flatten().cpu().numpy()
+                        self._safe_add_histogram(
+                            f"Actor/Parameters/{tag}", vals, self.training_step_idx
                         )
 
             self.writer.add_scalar(

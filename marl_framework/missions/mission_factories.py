@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 class MissionFactory:
     def __init__(self, params: Dict):
         self.params = params
+        # Use the fixed LOG_DIR so logs overwrite previous run (user preference)
         self.writer = SummaryWriter(LOG_DIR)
 
     @property

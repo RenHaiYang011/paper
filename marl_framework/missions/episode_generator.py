@@ -35,7 +35,7 @@ class EpisodeGenerator:
         self.collision_returns = []
         self.utility_returns = []
 
-    def execute(self, num_episode: int, batch_memory, coma_wrapper, mode):
+    def execute(self, num_episode: int, batch_memory, coma_wrapper, mode, global_step=None):
         mapping = Mapping(self.grid_map, self.sensor, self.params, num_episode)
         agents = self.init_agents(mapping, coma_wrapper)
         episode_return = 0
@@ -61,6 +61,8 @@ class EpisodeGenerator:
                 mapping.simulated_map,
                 self.params,
                 mode,
+                global_step,
+                prev_positions=positions if t > 0 else None,
             )
 
             agent_actions.append(actions)

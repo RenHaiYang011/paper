@@ -6,7 +6,8 @@ import constants
 import time
 
 import json
-
+import os
+from marl_framework.constants import REPO_DIR
 import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter
@@ -123,7 +124,10 @@ class Classification:
                 ) = episode.execute(
                     episode_idx, batch_memory, self.coma_wrapper, "train"
                 )
-            self.split_dataset(batch_memory)
+                self.split_dataset(batch_memory)
+                os.makedirs(os.path.join(REPO_DIR, "res", "plots"), exist_ok=True)
+                save_path = os.path.join(REPO_DIR, "res", "plots", f"means_{self.phase}_{episode_idx}.png")
+                plt.savefig(save_path)
         elif self.phase == "regression":
             self.regression()
         elif self.phase == "train":
@@ -1891,7 +1895,8 @@ def visualize_regression_performance(classifications, labels, phase, epoch, para
     # plt.show()
     # plt.legend()
     plt.savefig(
-        f"/home/penguin2/jonas-project/Experiment1/data1237_all/ipp_regression/cnn1/plots/means_{phase}_{epoch}.png"
+        os.makedirs(os.path.join(REPO_DIR, "res", "plots"), exist_ok=True),
+        f"{os.path.join(REPO_DIR, 'res', 'plots', f'means_{phase}_{epoch}.png')}"
     )
 
 

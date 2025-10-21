@@ -96,3 +96,19 @@ def get_fixed_footprint_coordinates(footprint, footprint_clipped):
         )
 
     return int(yu), int(yd), int(xl), int(xr)
+
+
+def compute_coverage(map_state: np.array) -> float:
+    """Compute coverage as fraction of cells that are observed (non-zero or non-nan).
+    Expects map_state in [0,1] where 0 indicates unknown/empty class and >0 indicates observed.
+    Returns fraction in [0,1].
+    """
+    if map_state is None:
+        return 0.0
+    try:
+        total = map_state.size
+        # treat NaN or exactly 0 as unobserved
+        observed = np.count_nonzero(~np.isnan(map_state) & (np.round(map_state, 6) != 0))
+        return float(observed) / float(total) if total > 0 else 0.0
+    except Exception:
+        return 0.0

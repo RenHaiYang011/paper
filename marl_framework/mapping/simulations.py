@@ -53,13 +53,11 @@ class Simulation:
     @staticmethod
     def get_noisy_map_section(sensor_noise, map_section, mode):
         accuracy = 1 - sensor_noise
-        correctness = torch.multinomial(
-            torch.tensor([sensor_noise, accuracy]), map_section.size, replacement=True
-        )
-        correctness = torch.reshape(correctness, np.shape(map_section)).numpy()
-        grid_value = map_section.copy()
-        grid_value = np.where(correctness == 0, abs(grid_value - 1), grid_value)
-        grid_value = accuracy * grid_value
-        np.putmask(grid_value, (1 - accuracy) > grid_value, 1 - accuracy)
-
-        return grid_value
+        correctness = torch.bernoulli(
+                torch.full(np.shape(map_section), 1 - sensor_noise)
+            )
+        correctness = (
+                torch.reshape(correctness, np.shape(map_section)).cpu().numpy()
+            )
+        noisy_map_section = np.abs(map_section - (1 - correctness))
+        return noisy_map_section

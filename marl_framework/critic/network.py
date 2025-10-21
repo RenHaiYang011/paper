@@ -6,7 +6,8 @@ from torch import nn
 
 logger = logging.getLogger(__name__)
 
-torch.autograd.set_detect_anomaly(True)
+# Disable autograd anomaly detection for performance
+torch.autograd.set_detect_anomaly(False)
 
 
 class CriticNetwork(nn.Module):

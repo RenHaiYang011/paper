@@ -10,7 +10,7 @@ from marl_framework.agent.communication_log import CommunicationLog
 from marl_framework.agent.state_space import AgentStateSpace
 from matplotlib import pyplot as plt
 
-
+# 带权熵地图
 def get_w_entropy_map(
     map_footprint: np.array,
     local_map: np.array,
@@ -114,11 +114,12 @@ def calculate_w_entropy(
 
     return w_entropy_map, weightings, se, w_entropy_map_footprint, grid_map
 
-
+# 计算信息熵
 def get_shannon_entropy(p):
+    p = torch.from_numpy(p)
     p[0.0001 > p] = 0.0001
     p[0.9999 < p] = 0.9999
-    return -p * np.log2(p) - (1 - p) * np.log2(1 - p)
+    return (-p * torch.log2(p) - (1 - p) * torch.log2(1 - p)).numpy()
 
 
 def append_global_information_to_timestep(

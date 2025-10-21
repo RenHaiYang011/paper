@@ -5,7 +5,7 @@ import torch
 from marl_framework.agent.state_space import AgentStateSpace
 from marl_framework.utils.state import get_w_entropy_map
 
-from utils.utils import compute_euclidean_distance
+from utils.utils import compute_euclidean_distance, compute_coverage
 
 
 def get_global_reward(
@@ -19,6 +19,15 @@ def get_global_reward(
     agent_id,
     t,
     budget,
+    coverage_weight: float = None,
+    distance_weight: float = 0.0,
+    footprint_weight: float = 0.0,
+    collision_weight: float = 0.0,
+    prev_positions=None,
+    next_positions=None,
+    writer=None,
+    global_step=None,
+    collision_distance=1.0,
 ):
     done = False
     reward = 0
@@ -31,20 +40,63 @@ def get_global_reward(
     fp_factor = 1
 
     absolute_utility_reward, relative_utility_reward = get_utility_reward(
-        last_map, next_map, simulated_map, agent_state_space
+        last_map, next_map, simulated_map, agent_state_space, coverage_weight
     )
+
+    # distance penalty (average over agents) — applied on utility level before scaling
+    mean_dist = 0.0
+    try:
+        if distance_weight is not None and float(distance_weight) != 0.0 and prev_positions is not None and next_positions is not None:
+            dists = []
+            # handle cases where positions are lists of tuples/arrays
+            for i in range(min(len(prev_positions), len(next_positions))):
+                p = np.array(prev_positions[i], dtype=np.float64)
+                q = np.array(next_positions[i], dtype=np.float64)
+                d = compute_euclidean_distance(p, q)
+                dists.append(d)
+            if len(dists) > 0:
+                mean_dist = float(np.mean(dists))
+                # subtract distance contribution from utility reward
+                absolute_utility_reward -= float(distance_weight) * mean_dist
+    except Exception:
+        # Do not fail reward computation due to distance penalty calculation
+        mean_dist = 0.0
+
     # print(f"absolute_utility_reward: {absolute_utility_reward}")
     absolute_reward = scale * absolute_utility_reward - offset
-    relative_reward = (
-        22 * relative_utility_reward - 0.5
-    )  # / cost_factor - 0.35       # 22, 0.5
+    relative_reward = 22 * relative_utility_reward - 0.5
 
-    # if mission_type == "DeepQ":
-    #     # footprint_penalty = get_footprint_penalty(footprints, agent_id, simulated_map, o_min, o_max, p_max)
-    #     absolute_utility_reward, relative_utility_reward = get_utility_reward(last_map, next_map, simulated_map,
-    #                                                                           agent_state_space)
-    #     absolute_reward = scale * absolute_utility_reward - offset
-    #     reward += 34 * relative_utility_reward - 0.25
+    # footprint overlap penalty
+    fp_pen = 0.0
+    try:
+        if footprints is not None and float(footprint_weight) != 0.0 and agent_id is not None:
+            fp_pen = get_footprint_penalty(footprints, agent_id, simulated_map, o_min, o_max, p_max)
+            absolute_reward -= float(footprint_weight) * float(fp_pen)
+    except Exception:
+        fp_pen = 0.0
+
+    # collision penalty: if next_positions indicates collision, apply penalty
+    coll_pen = 0.0
+    try:
+        if float(collision_weight) != 0.0 and next_positions is not None:
+            # detect any collisions in next_positions
+            done_flag, coll_reward = get_collision_reward(next_positions, False, collision_distance=collision_distance)
+            if done_flag:
+                coll_pen = float(abs(coll_reward))
+                absolute_reward -= float(collision_weight) * coll_pen
+    except Exception:
+        coll_pen = 0.0
+
+    # Log individual penalty components to TensorBoard if writer provided
+    try:
+        if writer is not None:
+            # write zeros if not active
+            writer.add_scalar('Penalties/Distance', float(mean_dist), global_step)
+            writer.add_scalar('Penalties/Footprint', float(fp_pen), global_step)
+            writer.add_scalar('Penalties/Collision', float(coll_pen), global_step)
+    except Exception:
+        # do not raise from logging
+        pass
 
     return (
         done,
@@ -53,10 +105,11 @@ def get_global_reward(
     )  # done, relative_reward, absolute_reward
 
 
-def get_collision_reward(next_positions, done):
+def get_collision_reward(next_positions, done, collision_distance=1.0):
+    """Return (done_flag, penalty_flag) where done_flag True if any pair closer than collision_distance."""
     for agent1 in range(len(next_positions)):
         for agent2 in range(agent1):
-            done = is_collided(next_positions[agent1], next_positions[agent2])
+            done = is_collided(next_positions[agent1], next_positions[agent2], collision_distance)
             if done:
                 break
         if done:
@@ -70,6 +123,7 @@ def get_utility_reward(
     state_: np.array,
     simulated_map: np.array,
     agent_state_space: AgentStateSpace,
+    coverage_weight: float = None,
 ):
     entropy_before = get_w_entropy_map(
         None, state, simulated_map, "reward", agent_state_space
@@ -81,17 +135,40 @@ def get_utility_reward(
     absolute_reward = np.mean(output[1] * entropy_reduction)
     relative_reward = absolute_reward / (np.mean(output[1] * entropy_before))
 
+    # coverage-based reward: reward positive change in coverage
+    try:
+        coverage_before = compute_coverage(state)
+        coverage_after = compute_coverage(state_)
+        coverage_delta = coverage_after - coverage_before
+    except Exception:
+        coverage_delta = 0.0
+
+    # decide weight: prefer provided coverage_weight, fallback to module constant
+    weight = COVERAGE_WEIGHT if coverage_weight is None else float(coverage_weight)
+    # add coverage contribution (small weight)
+    absolute_reward += weight * coverage_delta
+    # avoid divide by zero
+    denom = np.mean(output[1] * entropy_before)
+    if denom != 0:
+        relative_reward = absolute_reward / denom
+    else:
+        relative_reward = 0.0
+
     # plt.imshow(state)
     # plt.title(f"state before")
     # plt.clim(0, 1)
     # # plt.colorbar()
-    # plt.savefig(f"/home/penguin2/Documents/plots/state_before.png")
+    # from marl_framework.constants import REPO_DIR
+    # import os
+    # os.makedirs(os.path.join(REPO_DIR, "res", "plots"), exist_ok=True)
+    # plt.savefig(os.path.join(REPO_DIR, "res", "plots", "state_before.png"))
     #
     # plt.imshow(state_)
     # plt.title(f"state after")
     # plt.clim(0, 1)
     # # plt.colorbar()
     # plt.savefig(f"/home/penguin2/Documents/plots/state_after.png")
+    # plt.savefig(os.path.join(REPO_DIR, "res", "plots", "state_after.png"))
     #
     # plt.imshow(entropy_before)
     # plt.title(f"entropy_before")
@@ -121,7 +198,7 @@ def get_utility_reward(
     # plt.title(f"weighted reduction")
     # plt.clim(0, 1)
     # # plt.colorbar()
-    # plt.savefig(f"/home/penguin2/Documents/plots/weighted_reduction.png")
+    # plt.savefig(os.path.join(REPO_DIR, "res", "plots", "weighted_reduction.png"))
 
     # print(f"absolute_reward: {absolute_reward}")
     # print(f"relative_reward: {relative_reward}")
@@ -129,10 +206,22 @@ def get_utility_reward(
     return absolute_reward, relative_reward
 
 
-def is_collided(next_position_1, next_position_2):
-    if np.array_equal(next_position_1, next_position_2):
-        return True
-    return False
+def is_collided(next_position_1, next_position_2, collision_distance=1.0):
+    try:
+        p1 = np.array(next_position_1, dtype=np.float64)
+        p2 = np.array(next_position_2, dtype=np.float64)
+        # use 2D distance (x,y) to determine collision; include altitude if shapes require
+        if p1.size >= 2 and p2.size >= 2:
+            d = np.linalg.norm(p1[:2] - p2[:2])
+        else:
+            d = np.linalg.norm(p1 - p2)
+        return d <= float(collision_distance)
+    except Exception:
+        # fallback to strict equality
+        try:
+            return np.array_equal(next_position_1, next_position_2)
+        except Exception:
+            return False
 
 
 def get_footprint_penalty(footprints, agent_id, simulated_map, o_min, o_max, p_max):
