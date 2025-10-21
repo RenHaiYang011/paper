@@ -25,13 +25,14 @@ tensorboard --logdir /home/renhaiyang/paper_v2/ipp-marl/marl_framework/log --por
 cd ipp-marl/marl_framework python /home/renhaiyang/paper_v2/ipp-marl/marl_framework/utils/video_creator.py
 
 
+
 ## 自动化实验（批量运行）
 
 项目中提供了简易的实验脚本，用于网格搜索 `coverage_weight`, `distance_weight`, `n_agents` 并记录可复现的运行元数据。
 
 - 生成并运行实验（在仓库根目录下运行）：
 
-```bash
+```bash   
 python scripts/experiment_runner.py --coverage 0.0 0.05 --distance 0.0 0.01 --agents 2 4 --repeats 3
 ```
 
