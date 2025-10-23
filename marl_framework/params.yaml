@@ -53,11 +53,11 @@ experiment:
     use_eps: True
     class_weighting: [0, 1]
     reward_normalization: false
-  coverage_weight: 0.1   # 区域覆盖权重设置；信息应用+奖励多覆盖
-  distance_weight: 0.0   # 距离惩罚权重：每步按距离扣分（默认 0 表示禁用）
-  footprint_weight: 0.0  # 足迹重叠惩罚权重（默认 0 表示禁用）
-  collision_weight: 0.0  # 碰撞惩罚权重（默认 0 表示禁用）
-  collision_distance: 1.0  # 碰撞判定阈值（米），小于该距离视为碰撞
+  coverage_weight: 0.15   # 区域覆盖权重设置；信息应用+奖励多覆盖
+  distance_weight: 0.0    # 距离惩罚权重：每步按距离扣分（保持0以允许远距离探索）
+  footprint_weight: 0.5   # 足迹重叠惩罚权重（中等惩罚避免过度重叠）
+  collision_weight: 2.0   # 碰撞惩罚权重（强力惩罚确保避碰）
+  collision_distance: 5.0 # 碰撞判定阈值（米），等于一个移动步长提供安全距离
   baselines:
     lawnmower:
       trials: 50
@@ -82,12 +82,12 @@ evaluation:
 networks:
   device: "cuda" # "cuda" or "cpu"
   type: "CNN"
-  # data_passes: 5
-  # batch_size: 60
-  # batch_number: 5
-  data_passes: 1
-  batch_size: 16
-  batch_number: 3
+  data_passes: 5
+  batch_size: 60
+  batch_number: 5
+  # data_passes: 1
+  # batch_size: 16
+  # batch_number: 3
   copy_rate: 10     # full episodes
   gamma: 0.99
   lambda: 0.8
