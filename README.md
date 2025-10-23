@@ -253,9 +253,10 @@ cat docs/CONFIG_SELECTION_GUIDE.md
 
 ### 推荐训练流程
 
-```bash
+
 # 1. 首次快速验证 (确认代码能跑通)
 cd marl_framework/scripts
+chmod +x *.sh && ls -lh *.sh  (初始使用需要给脚本配置权限)
 CONFIG_FILE_PATH=configs/params_fast.yaml ./train_with_backup.sh quick_test
 # 预期: 10-15 小时
 
