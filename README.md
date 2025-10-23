@@ -105,11 +105,21 @@ CONFIG_FILE_PATH=configs/params.yaml ./train_with_backup.sh full_training
 ### 2. 监控训练
 
 ```bash
-# 在另一个终端监控 GPU
+# 方式 1: 使用项目监控脚本 (推荐) ⭐
+cd scripts
+./monitor_training.sh
+
+# 持续监控
+watch -n 2 ./monitor_training.sh
+
+# 方式 2: 使用 nvidia-smi
 watch -n 1 nvidia-smi
 
-# 或查看详细 GPU 信息
+# 方式 3: 查看详细 GPU 信息
 nvidia-smi dmon -s pucvmet
+
+# 方式 4: 查看训练日志
+tail -f ../log/training.log
 ```
 
 ### 3. 查看训练结果
@@ -282,16 +292,24 @@ CONFIG_FILE_PATH=configs/params.yaml ./train_with_backup.sh final_model
 ### 监控和调试
 
 ```bash
-# 实时监控 GPU
+# 实时监控 GPU (推荐使用项目脚本)
+cd marl_framework/scripts
+watch -n 2 ./monitor_training.sh
+
+# 或使用原生命令
 watch -n 1 nvidia-smi
 
 # 查看训练日志
-tail -f log/training.log
+tail -f ../log/training.log
 
 # 检查 GPU 利用率
 nvidia-smi dmon -i 0 -s pucvmet
 
+# 查看进程详情
+nvidia-smi pmon
+
 # 启动 TensorBoard
+cd ..
 tensorboard --logdir log/ --port 6006
 ```
 

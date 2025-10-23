@@ -75,6 +75,35 @@ source ~/.bashrc  # 重新加载
 
 详见: [../docs/GLIBCXX_FIX.md](../docs/GLIBCXX_FIX.md)
 
+---
+
+### monitor_training.sh ⭐ 训练监控脚本
+**用途**: 实时监控GPU使用情况和训练进程状态
+
+**使用方法**:
+```bash
+# 单次查看
+./monitor_training.sh
+
+# 持续监控 (推荐)
+watch -n 2 ./monitor_training.sh
+
+# 或使用循环
+while true; do clear; ./monitor_training.sh; sleep 2; done
+```
+
+**显示信息**:
+- ✅ GPU 状态 (利用率、显存、温度、功耗)
+- ✅ GPU 进程详情 (PID、类型、资源占用)
+- ✅ 当前用户的 Python 进程
+- ✅ Paper 项目相关进程
+- ✅ 进程启动时间和命令
+
+**优势**:
+- 📊 比 `nvidia-smi` 更清晰的格式化输出
+- 🔍 自动过滤当前用户和项目相关进程
+- 💡 提供实用的操作提示
+
 ## 🚀 完整训练流程
 
 ### 在Linux服务器上
