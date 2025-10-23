@@ -86,7 +86,14 @@ def test_cnn_forward():
     
     device = torch.device("cuda:0")
     
-    # 创建简单的CNN
+    # 创建简单的CNN (模拟项目中的Actor网络结构)
+    # 注意：项目中的网络使用了特殊的flatten，这里使用AdaptiveAvgPool来匹配
+    # 输入: [batch, 7, 50, 50]
+    # Conv1(5x5): [batch, 256, 46, 46]
+    # Conv2(4x4): [batch, 256, 43, 43]
+    # Conv3(4x4): [batch, 256, 40, 40]
+    # AdaptiveAvgPool: [batch, 256, 1, 1]
+    # Flatten: [batch, 256]
     model = torch.nn.Sequential(
         torch.nn.Conv2d(7, 256, 5),
         torch.nn.ReLU(),
@@ -94,6 +101,7 @@ def test_cnn_forward():
         torch.nn.ReLU(),
         torch.nn.Conv2d(256, 256, 4),
         torch.nn.ReLU(),
+        torch.nn.AdaptiveAvgPool2d((1, 1)),  # 自适应池化到1x1
         torch.nn.Flatten(),
         torch.nn.Linear(256, 256),
         torch.nn.ReLU(),

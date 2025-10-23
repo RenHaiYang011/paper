@@ -100,8 +100,17 @@ tensorboard --logdir .
 - 测试项目网络导入
 
 **使用**:
-```powershell
+```bash
 python test_gpu.py
+```
+
+**预期输出**:
+```
+CUDA可用: True
+GPU 0: NVIDIA RTX A6000 (47.41 GB)
+GPU加速比: 2-3x
+CNN前向传播: ~10-20ms
+✓ 所有网络已成功移动到GPU
 ```
 
 ### 2. `start_training.ps1` - 自动化训练启动
