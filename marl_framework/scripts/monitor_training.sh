@@ -17,16 +17,55 @@ nvidia-smi --query-gpu=index,name,utilization.gpu,memory.used,memory.total,tempe
 
 echo ""
 echo "=========================================="
-echo "📌 GPU 进程详情"
+echo "📌 GPU 进程详情 (所有用户)"
 echo "=========================================="
 
-# 显示 GPU 进程
-nvidia-smi pmon -c 1 2>/dev/null | grep -v "^#" | grep -v "no processes" | \
-    awk 'NF {printf "GPU %s | PID: %s | Type: %s | GPU Util: %s%% | Mem: %sMB | CMD: %s\n", $1, $2, $3, $4, $5, $NF}'
-
-# 如果没有进程
-if [ $? -ne 0 ] || [ -z "$(nvidia-smi pmon -c 1 2>/dev/null | grep -v '^#')" ]; then
+# 显示所有 GPU 进程
+ALL_PROCS=$(nvidia-smi pmon -c 1 2>/dev/null | grep -v "^#" | grep -v "no processes")
+if [ -n "$ALL_PROCS" ]; then
+    echo "$ALL_PROCS" | awk 'NF {
+        gpu=$1; pid=$2; type=$3; sm=$4; mem=$5; cmd=$NF
+        
+        # 获取进程用户
+        user=$(ps -o user= -p '"$pid"' 2>/dev/null || echo "unknown")
+        
+        # 标记当前用户的进程
+        if [ "$user" = "$(whoami)" ]; then
+            printf "✓ [我的] "
+        else
+            printf "  [%s] ", user
+        fi
+        
+        printf "GPU %s | PID: %s | Type: %s | GPU Util: %s%% | Mem: %sMB | CMD: %s\n", gpu, pid, type, sm, mem, cmd
+    }'
+else
     echo "  (当前没有 GPU 进程)"
+fi
+
+echo ""
+echo "=========================================="
+echo "✨ 我的 GPU 进程"
+echo "=========================================="
+
+# 只显示当前用户的 GPU 进程
+MY_GPU_PROCS=$(nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv,noheader 2>/dev/null)
+if [ -n "$MY_GPU_PROCS" ]; then
+    echo "$MY_GPU_PROCS" | while IFS=, read -r pid cmd mem; do
+        proc_user=$(ps -o user= -p "$pid" 2>/dev/null | tr -d ' ')
+        if [ "$proc_user" = "$(whoami)" ]; then
+            # 找出在哪个GPU上
+            gpu_id=$(nvidia-smi pmon -c 1 2>/dev/null | grep "$pid" | awk '{print $1}')
+            echo "  GPU $gpu_id | PID: $pid | 显存: $mem | 命令: $cmd"
+            
+            # 显示完整命令
+            full_cmd=$(ps -o cmd= -p "$pid" 2>/dev/null)
+            if [ -n "$full_cmd" ]; then
+                echo "    完整命令: $full_cmd"
+            fi
+        fi
+    done
+else
+    echo "  (你当前没有 GPU 进程)"
 fi
 
 echo ""
