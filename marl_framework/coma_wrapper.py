@@ -30,13 +30,19 @@ class COMAWrapper:
         self.n_agents = self.params["experiment"]["missions"]["n_agents"]
         self.budget = params["experiment"]["constraints"]["budget"]
         self.agent_state_space = AgentStateSpace(self.params)
-        self.actor_network = ActorNetwork(self.params)
+        
+        # Initialize networks and move to GPU
+        import constants
+        self.actor_network = ActorNetwork(self.params).to(constants.DEVICE)
         self.actor_learner = ActorLearner(
             self.params, writer, self.actor_network, self.agent_state_space
         )
-        self.critic_network = CriticNetwork(self.params)
-        self.target_critic_network = copy.deepcopy(self.critic_network)
+        self.critic_network = CriticNetwork(self.params).to(constants.DEVICE)
+        self.target_critic_network = copy.deepcopy(self.critic_network).to(constants.DEVICE)
         self.critic_learner = CriticLearner(self.params, writer, self.critic_network)
+        
+        logger.info(f"Actor network moved to {constants.DEVICE}")
+        logger.info(f"Critic network moved to {constants.DEVICE}")
 
 
     def build_observations(

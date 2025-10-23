@@ -82,8 +82,9 @@ evaluation:
 networks:
   device: "cuda" # "cuda" or "cpu"
   type: "CNN"
+  # Optimized for GPU training - larger batch for better GPU utilization
   data_passes: 5
-  batch_size: 60
+  batch_size: 128    # Increased from 60 to 128 for better GPU utilization
   batch_number: 5
   # data_passes: 1
   # batch_size: 16
