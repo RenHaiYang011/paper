@@ -35,7 +35,7 @@ REPO_DIR = os.path.dirname(os.path.abspath(__file__)) + os.sep
 # REPO_DIR = "/home/julius/Dokumente/Uni/Bonn/multi_agent_rl/marl_framework/"
 # REPO_DIR = "/home/masha/jonas/multi_agent_rl/marl_framework/"
 
-CONFIG_FILE_PATH = load_from_env("CONFIG_FILE_PATH", str, "params.yaml")
+CONFIG_FILE_PATH = load_from_env("CONFIG_FILE_PATH", str, "configs/params.yaml")
 CONFIG_FILE_PATH = os.path.join(REPO_DIR, CONFIG_FILE_PATH)
 
 CHECKPOINTS_DIR = load_from_env("CHECKPOINTS_DIR", str, "checkpoints")

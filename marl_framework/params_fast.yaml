@@ -1,0 +1,124 @@
+# 快速训练配置 - 优化GPU利用率
+# 使用方法: export CONFIG_FILE_PATH=params_fast.yaml && python main.py
+
+environment:
+  num_envs: 2
+  seed: 3
+  x_dim: 50
+  y_dim: 50
+
+sensor:
+  type: "rgb_camera"
+  field_of_view:
+    angle_x: 60
+    angle_y: 60
+  pixel:
+    number_x: 57
+    number_y: 57
+  encoding: "rgb8"
+  model:
+    type: "altitude_dependent"
+    coeff_a: 0.05
+    coeff_b: 0.2
+  simulation:
+    type: "random_field"
+    cluster_radius: 5
+
+mapping:
+  prior: 0.5
+
+experiment:
+  title: "fast_training"
+  constraints:
+    spacing: 5
+    min_altitude: 5
+    max_altitude: 15
+    budget: 8                # ← 从14减到8，大幅减少CPU计算
+    num_actions: 6
+  uav:
+    max_v: 5
+    max_a: 2
+    sampling_time: 2
+    communication_range: 25
+    fix_range: True
+    failure_rate: 0
+  missions:
+    type: "COMA"
+    mission_mode: "training"
+    n_episodes: 500          # ← 从1500减到500，快速测试
+    patience: 100
+    n_agents: 4
+    action_space: "larger"
+    planning_uncertainty: "SE"
+    eps_max: 0.5
+    eps_min: 0.02
+    eps_anneal_phase: 10000
+    use_eps: True
+    class_weighting: [0, 1]
+    reward_normalization: false
+  coverage_weight: 0.15
+  distance_weight: 0.0
+  footprint_weight: 0.5
+  collision_weight: 2.0
+  collision_distance: 5.0
+  baselines:
+    lawnmower:
+      trials: 50
+      altitude: 5
+    random:
+      n_episodes: 50
+    information_gain:
+      trials: 50
+      communication: true
+
+evaluation:
+  repetitions: 1
+  metrics:
+    - "num_waypoints"
+    - "paths"
+    - "rmse"
+    - "wrmse"
+    - "mll"
+    - "wmll"
+    - "run_time"
+
+networks:
+  device: "cuda"
+  type: "CNN"
+  data_passes: 2           # ← 从3减到2
+  batch_size: 32           # ← 从64减到32
+  batch_number: 2          # ← 从3减到2
+  copy_rate: 10
+  gamma: 0.99
+  lambda: 0.8
+  actor:
+    hidden_dim: 128
+    learning_rate: 0.00001
+    momentum: 0.9
+    gradient_norm: 10
+  critic:
+    target_update_mode: "hard"
+    tau: 0.01
+    update_mode: "random_batches"
+    synchronization: "no"
+    fc1_dim: 64
+    learning_rate: 0.0001
+    momentum: 0.9
+    gradient_norm: 10
+
+classification:
+  n_episodes: 300
+  data_split: [0.4, 0.4, 0.2]
+  number_epochs: 100
+  batch_size: 50
+
+# 配置说明:
+# - budget: 8 (减少每个episode的步数，减轻CPU压力)
+# - n_episodes: 500 (快速验证训练效果)
+# - batch_size: 32 (减少内存和计算压力)
+# - data_passes: 2 (加快训练循环)
+#
+# 预期效果:
+# - 总训练步数: ~2,083步
+# - 预计时间: 10-15小时
+# - GPU利用率应该提升到20-40%

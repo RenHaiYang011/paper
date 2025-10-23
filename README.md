@@ -35,6 +35,16 @@ watch -n 1 nvidia-smi
 ./manage_training_history.sh list
 
 
+### 快速验证
+CONFIG_FILE_PATH=params_fast.yaml ./train_with_backup.sh test_fast
+## 平衡时间
+CONFIG_FILE_PATH=params_balanced.yaml ./train_with_backup.sh production_v1
+## 全量训练
+CONFIG_FILE_PATH=params.yaml ./train_with_backup.sh full_training
+./train_with_backup.sh full_training
+
+
+
 # 例： 调整collision_weight  或者直接修改文件内容
 nano params.yaml  # 修改collision_weight: 3.0
 ./train_with_backup.sh exp_collision_3.0
