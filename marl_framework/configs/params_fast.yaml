@@ -27,10 +27,11 @@ sensor:
 mapping:
   prior: 0.5
 
+
 experiment:
   title: "fast_training"
   constraints:
-    spacing: 5    # 必须为整数，以优化计算
+    spacing: 5       # 必须为整数，以优化计算
     min_altitude: 5
     max_altitude: 25
     budget: 8                # ← 从14减到8，大幅减少CPU计算
