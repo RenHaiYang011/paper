@@ -6,6 +6,7 @@ from marl_framework.agent.state_space import AgentStateSpace
 from marl_framework.utils.state import get_w_entropy_map
 from marl_framework.mapping.search_regions import SearchRegionManager
 from marl_framework.mapping.frontier_detection import FrontierManager
+from marl_framework.utils.coordination import CoordinationManager
 
 from utils.utils import compute_euclidean_distance, compute_coverage
 
@@ -44,6 +45,8 @@ def get_global_reward(
     # Frontier-based intrinsic reward parameters
     frontier_manager: FrontierManager = None,
     spacing: float = 5.0,
+    # Coordination parameters
+    coordination_manager: CoordinationManager = None,
 ):
     done = False
     reward = 0
@@ -195,6 +198,34 @@ def get_global_reward(
         # Don't fail reward computation if frontier reward fails
         frontier_reward = 0.0
 
+    # ==================== Coordination Rewards ====================
+    coordination_rewards = {
+        'overlap_penalty': 0.0,
+        'division_reward': 0.0,
+        'collaboration_reward': 0.0,
+        'total_coordination': 0.0
+    }
+    
+    try:
+        if coordination_manager is not None and agent_id is not None and coordination_manager.enabled:
+            # Get all agent positions
+            if next_positions is not None and len(next_positions) > 1:
+                # Get search regions if available
+                regions = None
+                if search_region_manager is not None:
+                    regions = search_region_manager.regions
+                
+                # Calculate coordination rewards
+                coordination_rewards = coordination_manager.calculate_coordination_rewards(
+                    agent_id, next_positions, regions
+                )
+                
+                # Add to absolute reward
+                absolute_reward += coordination_rewards['total_coordination']
+    except Exception as e:
+        # Don't fail reward computation if coordination fails
+        coordination_rewards['total_coordination'] = 0.0
+
     # Log individual penalty components to TensorBoard if writer provided
     try:
         if writer is not None:
@@ -228,6 +259,12 @@ def get_global_reward(
                 if 'frontier_reward' in frontier_stats:
                     writer.add_scalar('Frontier/Avg_Reward', frontier_stats['frontier_reward']['avg_frontier_reward'], global_step)
                     writer.add_scalar('Frontier/Total_Reward', frontier_stats['frontier_reward']['total_frontier_reward'], global_step)
+            
+            # Coordination rewards
+            writer.add_scalar('Coordination/Overlap_Penalty', coordination_rewards['overlap_penalty'], global_step)
+            writer.add_scalar('Coordination/Division_Reward', coordination_rewards['division_reward'], global_step)
+            writer.add_scalar('Coordination/Collaboration_Reward', coordination_rewards['collaboration_reward'], global_step)
+            writer.add_scalar('Coordination/Total_Coordination_Reward', coordination_rewards['total_coordination'], global_step)
     except Exception:
         # do not raise from logging
         pass

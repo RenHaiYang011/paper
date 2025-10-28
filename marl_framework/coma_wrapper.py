@@ -13,6 +13,7 @@ from marl_framework.critic.learner import CriticLearner
 from marl_framework.critic.network import CriticNetwork
 from marl_framework.mapping.search_regions import SearchRegionManager
 from marl_framework.mapping.frontier_detection import FrontierManager
+from marl_framework.utils.coordination import CoordinationManager
 
 from actor.transformations import get_network_input as get_actor_input
 from critic.transformations import get_network_input as get_critic_input
@@ -50,6 +51,13 @@ class COMAWrapper:
         if intrinsic_rewards.get("enable", False):
             self.frontier_manager = FrontierManager(params)
             logger.info("FrontierManager initialized for intrinsic rewards")
+        
+        # Coordination mechanism parameters
+        self.coordination_manager: Optional[CoordinationManager] = None
+        coordination_config = params.get("experiment", {}).get("coordination", {})
+        if coordination_config.get("enable", False):
+            self.coordination_manager = CoordinationManager(params, self.n_agents)
+            logger.info("CoordinationManager initialized for multi-agent coordination")
         
         # Initialize networks and move to GPU
         import constants
@@ -141,6 +149,13 @@ class COMAWrapper:
                 self.frontier_manager.update(critic_map_knowledge)
             except Exception as e:
                 logger.warning(f"Failed to update frontier manager: {e}")
+        
+        # Update coordination manager with agent positions
+        if self.coordination_manager is not None and self.coordination_manager.enabled:
+            try:
+                self.coordination_manager.update_positions(next_positions)
+            except Exception as e:
+                logger.warning(f"Failed to update coordination manager: {e}")
 
         for agent_id in range(self.n_agents):
             next_map, next_position, eps, action, footprint_idx, map2communicate = agents[
@@ -240,6 +255,8 @@ class COMAWrapper:
                 # Frontier-based intrinsic reward parameters
                 frontier_manager=self.frontier_manager,
                 spacing=self.params["experiment"]["constraints"]["spacing"],
+                # Coordination parameters
+                coordination_manager=self.coordination_manager,
             )
 
             # log coverage delta and absolute coverage to TensorBoard if writer available
