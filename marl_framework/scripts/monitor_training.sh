@@ -23,21 +23,26 @@ echo "=========================================="
 # 显示所有 GPU 进程
 ALL_PROCS=$(nvidia-smi pmon -c 1 2>/dev/null | grep -v "^#" | grep -v "no processes")
 if [ -n "$ALL_PROCS" ]; then
-    echo "$ALL_PROCS" | awk 'NF {
-        gpu=$1; pid=$2; type=$3; sm=$4; mem=$5; cmd=$NF
-        
-        # 获取进程用户
-        user=$(ps -o user= -p '"$pid"' 2>/dev/null || echo "unknown")
-        
-        # 标记当前用户的进程
+    echo "$ALL_PROCS" | while read -r line; do
+        # nvidia-smi pmon 输出字段: GPU PID Type SM Mem Command
+        gpu=$(echo "$line" | awk '{print $1}')
+        pid=$(echo "$line" | awk '{print $2}')
+        type=$(echo "$line" | awk '{print $3}')
+        sm=$(echo "$line" | awk '{print $4}')
+        mem=$(echo "$line" | awk '{print $5}')
+        cmd=$(echo "$line" | awk '{print $6}')
+
+        # 获取进程用户 (在 shell 中执行,避免在 awk 中嵌套shell)
+        user=$(ps -o user= -p "$pid" 2>/dev/null || echo "unknown")
+
         if [ "$user" = "$(whoami)" ]; then
             printf "✓ [我的] "
         else
-            printf "  [%s] ", user
+            printf "  [%s] ", "$user"
         fi
-        
-        printf "GPU %s | PID: %s | Type: %s | GPU Util: %s%% | Mem: %sMB | CMD: %s\n", gpu, pid, type, sm, mem, cmd
-    }'
+
+        printf "GPU %s | PID: %s | Type: %s | GPU Util: %s%% | Mem: %sMB | CMD: %s\n", "$gpu", "$pid", "$type", "$sm", "$mem", "$cmd"
+    done
 else
     echo "  (当前没有 GPU 进程)"
 fi
