@@ -71,7 +71,9 @@ def plot_trajectories(
     #     interpolation=cv2.INTER_AREA,
     # )
 
-    Y, X = np.meshgrid(range(0, 493), range(0, 493))  # 51
+    # Use actual simulated_map shape instead of hardcoded (493, 493)
+    map_height, map_width = simulated_map.shape
+    Y, X = np.meshgrid(range(0, map_width), range(0, map_height))
     ax.plot_surface(
         Y,
         X,
@@ -94,14 +96,35 @@ def plot_trajectories(
         # ax.plot(y[0], x[0], color=colors[agent_id], marker="o", markersize=14)
     ax.view_init(40, 50)
 
-    ax.set_xlim(0, 493)
-    ax.set_ylim(0, 493)
-    ax.set_zlim(0, 15)
-    ax.set_xticks([0, 98.6, 197.2, 295.8, 394.4, 493])
+    # Use dynamic limits based on actual map and altitude range
+    ax.set_xlim(0, map_width)
+    ax.set_ylim(0, map_height)
+    
+    # Get altitude range from agent positions
+    all_altitudes = [pos[agent_id][2] for agent_id in range(n_agents) for pos in agent_positions]
+    if all_altitudes:
+        min_alt = min(all_altitudes)
+        max_alt = max(all_altitudes)
+        # Add some padding
+        z_min = max(0, min_alt - 5)
+        z_max = max_alt + 5
+        ax.set_zlim(z_min, z_max)
+        # Set z ticks dynamically
+        z_step = max(5, int((z_max - z_min) / 3))
+        z_ticks = list(range(int(z_min), int(z_max) + 1, z_step))
+        if z_ticks:
+            ax.set_zticks(z_ticks)
+    else:
+        ax.set_zlim(0, 30)  # fallback
+        ax.set_zticks([0, 10, 20, 30])
+    
+    # Set x/y ticks dynamically
+    x_step = map_width // 5
+    y_step = map_height // 5
+    ax.set_xticks([i * x_step for i in range(6)])
     ax.set_xticklabels([0, 10, 20, 30, 40, 50])
-    ax.set_yticks([0, 98.6, 197.2, 295.8, 394.4, 493])
+    ax.set_yticks([i * y_step for i in range(6)])
     ax.set_yticklabels([0, 10, 20, 30, 40, 50])
-    ax.set_zticks([5, 10, 15])
 
     # Save to disk (uncomment if you prefer files)
     # fig.savefig(os.path.join(LOG_PLOTS_DIR, f"coma_pathes_3d_{training_step_index}.png"))
