@@ -4,6 +4,7 @@ import torch
 
 from marl_framework.agent.state_space import AgentStateSpace
 from marl_framework.utils.state import get_w_entropy_map
+from marl_framework.mapping.search_regions import SearchRegionManager
 
 from utils.utils import compute_euclidean_distance, compute_coverage
 
@@ -30,6 +31,15 @@ def get_global_reward(
     collision_distance=1.0,
     class_weighting: list = None,
     altitude_diversity_weight: float = 0.0,
+    # Region search parameters
+    search_region_manager: SearchRegionManager = None,
+    region_coverage_weight: float = 0.0,
+    region_priority_weight: float = 0.0,
+    search_density_weight: float = 0.0,
+    search_completion_weight: float = 0.0,
+    redundant_search_penalty: float = 0.0,
+    region_transition_penalty: float = 0.0,
+    sensor_footprint: np.ndarray = None,
 ):
     done = False
     reward = 0
@@ -112,6 +122,56 @@ def get_global_reward(
     except Exception as e:
         altitude_bonus = 0.0
 
+    # ==================== Region Search Rewards ====================
+    region_rewards = {
+        'region_coverage': 0.0,
+        'region_priority': 0.0,
+        'search_density': 0.0,
+        'search_completion': 0.0,
+        'redundant_search': 0.0,
+        'region_transition': 0.0,
+        'total_region_reward': 0.0
+    }
+    
+    try:
+        if search_region_manager is not None and agent_id is not None:
+            # Get current and previous positions for this agent
+            if next_positions is not None and len(next_positions) > agent_id:
+                current_pos = np.array(next_positions[agent_id])
+                prev_pos = np.array(prev_positions[agent_id]) if prev_positions is not None and len(prev_positions) > agent_id else current_pos
+                
+                # Calculate region-specific rewards
+                region_rewards_raw = search_region_manager.calculate_search_reward(
+                    current_pos, prev_pos, sensor_footprint if sensor_footprint is not None else []
+                )
+                
+                # Apply configured weights
+                region_rewards['region_coverage'] = float(region_coverage_weight) * region_rewards_raw['region_coverage']
+                region_rewards['region_priority'] = float(region_priority_weight) * region_rewards_raw['region_priority']
+                region_rewards['search_density'] = float(search_density_weight) * region_rewards_raw['search_density']
+                region_rewards['redundant_search'] = float(redundant_search_penalty) * region_rewards_raw['redundant_search']
+                region_rewards['region_transition'] = float(region_transition_penalty) * region_rewards_raw['region_transition']
+                
+                # Search completion bonus (only when reaching completion threshold)
+                if search_region_manager.get_search_completion() >= search_region_manager.completion_threshold:
+                    region_rewards['search_completion'] = float(search_completion_weight)
+                
+                # Sum all region rewards
+                region_rewards['total_region_reward'] = sum([
+                    region_rewards['region_coverage'],
+                    region_rewards['region_priority'],
+                    region_rewards['search_density'],
+                    region_rewards['search_completion'],
+                    region_rewards['redundant_search'],
+                    region_rewards['region_transition']
+                ])
+                
+                # Add to absolute reward
+                absolute_reward += region_rewards['total_region_reward']
+    except Exception as e:
+        # Don't fail reward computation if region search fails
+        pass
+
     # Log individual penalty components to TensorBoard if writer provided
     try:
         if writer is not None:
@@ -120,6 +180,20 @@ def get_global_reward(
             writer.add_scalar('Penalties/Footprint', float(fp_pen), global_step)
             writer.add_scalar('Penalties/Collision', float(coll_pen), global_step)
             writer.add_scalar('Bonuses/Altitude_Diversity', float(altitude_bonus), global_step)
+            
+            # Region search rewards
+            writer.add_scalar('RegionSearch/Coverage_Reward', region_rewards['region_coverage'], global_step)
+            writer.add_scalar('RegionSearch/Priority_Reward', region_rewards['region_priority'], global_step)
+            writer.add_scalar('RegionSearch/Density_Reward', region_rewards['search_density'], global_step)
+            writer.add_scalar('RegionSearch/Completion_Reward', region_rewards['search_completion'], global_step)
+            writer.add_scalar('RegionSearch/Redundant_Penalty', region_rewards['redundant_search'], global_step)
+            writer.add_scalar('RegionSearch/Transition_Penalty', region_rewards['region_transition'], global_step)
+            writer.add_scalar('RegionSearch/Total_Region_Reward', region_rewards['total_region_reward'], global_step)
+            
+            # Log search completion percentage
+            if search_region_manager is not None:
+                completion = search_region_manager.get_search_completion()
+                writer.add_scalar('RegionSearch/Completion_Percentage', completion * 100, global_step)
     except Exception:
         # do not raise from logging
         pass

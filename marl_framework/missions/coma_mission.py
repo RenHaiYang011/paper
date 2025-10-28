@@ -1,7 +1,7 @@
 import logging
 import os
 import time
-from typing import Dict
+from typing import Dict, Optional
 
 import numpy as np
 import seaborn as sns
@@ -12,6 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 import marl_framework.constants as constants
 from marl_framework.missions.episode_generator import EpisodeGenerator
 from marl_framework.missions.missions import Mission
+from marl_framework.mapping.search_regions import SearchRegionManager
 
 from batch_memory import BatchMemory
 from coma_wrapper import COMAWrapper
@@ -45,6 +46,29 @@ class COMAMission(Mission):
         self.collision_returns = []
         self.utility_returns = []
         self.mode = "train"
+        
+        # Initialize SearchRegionManager if region search config exists
+        self.search_region_manager: Optional[SearchRegionManager] = None
+        if "search_regions" in self.params:
+            try:
+                # Get map shape from grid_map
+                map_shape = (
+                    int(self.params["environment"]["y_dim"] // self.params["experiment"]["constraints"]["spacing"]),
+                    int(self.params["environment"]["x_dim"] // self.params["experiment"]["constraints"]["spacing"])
+                )
+                spacing = self.params["experiment"]["constraints"]["spacing"]
+                
+                self.search_region_manager = SearchRegionManager(
+                    config=self.params["search_regions"],
+                    map_shape=map_shape,
+                    spacing=spacing
+                )
+                # Attach to coma_wrapper
+                self.coma_wrapper.set_search_region_manager(self.search_region_manager)
+                logger.info(f"✓ SearchRegionManager initialized with {len(self.search_region_manager.regions)} regions")
+            except Exception as e:
+                logger.warning(f"Failed to initialize SearchRegionManager: {e}")
+                self.search_region_manager = None
         
         # Logging/plotting frequency (throttle heavy ops)
         logging_cfg = self.params.get("logging", {})

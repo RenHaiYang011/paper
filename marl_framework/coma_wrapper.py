@@ -1,6 +1,6 @@
 import copy
 import logging
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from torch.utils.tensorboard import SummaryWriter
 
@@ -11,6 +11,7 @@ from marl_framework.agent.communication_log import CommunicationLog
 from marl_framework.agent.state_space import AgentStateSpace
 from marl_framework.critic.learner import CriticLearner
 from marl_framework.critic.network import CriticNetwork
+from marl_framework.mapping.search_regions import SearchRegionManager
 
 from actor.transformations import get_network_input as get_actor_input
 from critic.transformations import get_network_input as get_critic_input
@@ -33,6 +34,15 @@ class COMAWrapper:
         self.altitude_diversity_weight = params["experiment"].get("altitude_diversity_weight", 0.0)
         self.agent_state_space = AgentStateSpace(self.params)
         
+        # Region search parameters
+        self.search_region_manager: Optional[SearchRegionManager] = None
+        self.region_coverage_weight = params["experiment"].get("region_coverage_weight", 0.0)
+        self.region_priority_weight = params["experiment"].get("region_priority_weight", 0.0)
+        self.search_density_weight = params["experiment"].get("search_density_weight", 0.0)
+        self.search_completion_weight = params["experiment"].get("search_completion_weight", 0.0)
+        self.redundant_search_penalty = params["experiment"].get("redundant_search_penalty", 0.0)
+        self.region_transition_penalty = params["experiment"].get("region_transition_penalty", 0.0)
+        
         # Initialize networks and move to GPU
         import constants
         self.actor_network = ActorNetwork(self.params).to(constants.DEVICE)
@@ -45,6 +55,11 @@ class COMAWrapper:
         
         logger.info(f"Actor network moved to {constants.DEVICE}")
         logger.info(f"Critic network moved to {constants.DEVICE}")
+    
+    def set_search_region_manager(self, manager: SearchRegionManager):
+        """Set the search region manager (called from COMAMission)"""
+        self.search_region_manager = manager
+        logger.info(f"SearchRegionManager attached to COMAWrapper")
 
 
     def build_observations(
@@ -195,6 +210,15 @@ class COMAWrapper:
                 global_step=global_step,
                 class_weighting=self.class_weighting,
                 altitude_diversity_weight=self.altitude_diversity_weight,
+                # Region search parameters
+                search_region_manager=self.search_region_manager,
+                region_coverage_weight=self.region_coverage_weight,
+                region_priority_weight=self.region_priority_weight,
+                search_density_weight=self.search_density_weight,
+                search_completion_weight=self.search_completion_weight,
+                redundant_search_penalty=self.redundant_search_penalty,
+                region_transition_penalty=self.region_transition_penalty,
+                sensor_footprint=None,  # TODO: get actual sensor footprint
             )
 
             # log coverage delta and absolute coverage to TensorBoard if writer available
