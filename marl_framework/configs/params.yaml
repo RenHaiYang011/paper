@@ -58,6 +58,7 @@ experiment:
   footprint_weight: 0.5   # 足迹重叠惩罚权重（中等惩罚避免过度重叠）
   collision_weight: 2.0   # 碰撞惩罚权重（强力惩罚确保避碰）
   collision_distance: 5.0 # 碰撞判定阈值（米），等于一个移动步长提供安全距离
+  altitude_diversity_weight: 0.5  # 高度多样性奖励权重: 鼓励agents在不同高度探索以获得更好的传感器性能
   baselines:
     lawnmower:
       trials: 50

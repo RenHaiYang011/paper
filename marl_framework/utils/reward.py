@@ -29,6 +29,7 @@ def get_global_reward(
     global_step=None,
     collision_distance=1.0,
     class_weighting: list = None,
+    altitude_diversity_weight: float = 0.0,
 ):
     done = False
     reward = 0
@@ -88,6 +89,29 @@ def get_global_reward(
     except Exception:
         coll_pen = 0.0
 
+    # altitude diversity bonus: encourage agents to explore different altitudes
+    altitude_bonus = 0.0
+    try:
+        if float(altitude_diversity_weight) != 0.0 and next_positions is not None and len(next_positions) > 1:
+            # Calculate altitude variance across all agents
+            altitudes = [pos[2] for pos in next_positions if len(pos) > 2]
+            if len(altitudes) > 1:
+                altitude_variance = float(np.var(altitudes))
+                # Also reward individual altitude changes
+                if prev_positions is not None and len(prev_positions) == len(next_positions):
+                    altitude_changes = []
+                    for i in range(len(prev_positions)):
+                        if len(prev_positions[i]) > 2 and len(next_positions[i]) > 2:
+                            alt_change = abs(next_positions[i][2] - prev_positions[i][2])
+                            altitude_changes.append(alt_change)
+                    if altitude_changes:
+                        mean_altitude_change = float(np.mean(altitude_changes))
+                        # Bonus combines variance (diversity across agents) and change (temporal variation)
+                        altitude_bonus = float(altitude_diversity_weight) * (altitude_variance * 0.01 + mean_altitude_change * 0.1)
+                        absolute_reward += altitude_bonus
+    except Exception as e:
+        altitude_bonus = 0.0
+
     # Log individual penalty components to TensorBoard if writer provided
     try:
         if writer is not None:
@@ -95,6 +119,7 @@ def get_global_reward(
             writer.add_scalar('Penalties/Distance', float(mean_dist), global_step)
             writer.add_scalar('Penalties/Footprint', float(fp_pen), global_step)
             writer.add_scalar('Penalties/Collision', float(coll_pen), global_step)
+            writer.add_scalar('Bonuses/Altitude_Diversity', float(altitude_bonus), global_step)
     except Exception:
         # do not raise from logging
         pass

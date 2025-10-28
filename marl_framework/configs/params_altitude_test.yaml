@@ -1,5 +1,5 @@
-# 快速训练配置 - 优化GPU利用率
-# 使用方法: export CONFIG_FILE_PATH=params_fast.yaml && python main.py
+# 高度多样性测试配置 - 专门测试3D路径规划
+# 使用方法: export CONFIG_FILE_PATH=configs/params_altitude_test.yaml && python main.py
 
 environment:
   num_envs: 2
@@ -17,7 +17,7 @@ sensor:
     number_y: 57
   encoding: "rgb8"
   model:
-    type: "altitude_dependent"
+    type: "altitude_dependent"  # 高度依赖的传感器模型
     coeff_a: 0.05
     coeff_b: 0.2
   simulation:
@@ -28,13 +28,13 @@ mapping:
   prior: 0.5
 
 experiment:
-  title: "fast_training"
+  title: "altitude_diversity_test"
   constraints:
-    spacing: 2.5
+    spacing: 5
     min_altitude: 5
-    max_altitude: 25
-    budget: 8                # ← 从14减到8，大幅减少CPU计算
-    num_actions: 6
+    max_altitude: 15        # 3个高度层: 5, 10, 15
+    budget: 8
+    num_actions: 6          # 6动作空间: 包含上升/下降
   uav:
     max_v: 5
     max_a: 2
@@ -45,7 +45,7 @@ experiment:
   missions:
     type: "COMA"
     mission_mode: "training"
-    n_episodes: 500          # ← 从1500减到500，快速测试
+    n_episodes: 500
     patience: 100
     n_agents: 4
     action_space: "larger"
@@ -54,23 +54,14 @@ experiment:
     eps_min: 0.02
     eps_anneal_phase: 10000
     use_eps: True
-    class_weighting: [0, 1] 
+    class_weighting: [0, 1]
     reward_normalization: false
   coverage_weight: 0.15
   distance_weight: 0.0
   footprint_weight: 0.5
   collision_weight: 2.0
   collision_distance: 5.0
-  altitude_diversity_weight: 0.5  # 高度多样性奖励权重: 鼓励agents在不同高度探索
-  baselines:
-    lawnmower:
-      trials: 50
-      altitude: 5
-    random:
-      n_episodes: 50
-    information_gain:
-      trials: 50
-      communication: true
+  altitude_diversity_weight: 0.5  # ⭐ 高度多样性奖励权重
 
 evaluation:
   repetitions: 1
@@ -86,9 +77,9 @@ evaluation:
 networks:
   device: "cuda"
   type: "CNN"
-  data_passes: 2           # ← 从3减到2
-  batch_size: 32           # ← 从64减到32
-  batch_number: 2          # ← 从3减到2
+  data_passes: 2
+  batch_size: 32
+  batch_number: 2
   copy_rate: 10
   gamma: 0.99
   lambda: 0.8
@@ -114,12 +105,17 @@ classification:
   batch_size: 50
 
 # 配置说明:
-# - budget: 8 (减少每个episode的步数，减轻CPU压力)
-# - n_episodes: 500 (快速验证训练效果)
-# - batch_size: 32 (减少内存和计算压力)
-# - data_passes: 2 (加快训练循环)
+# ⭐ altitude_diversity_weight: 0.5
+#   - 鼓励agents在不同高度探索
+#   - 奖励空间多样性(agents分布在不同高度层)
+#   - 奖励时间变化(agents垂直移动)
 #
 # 预期效果:
-# - 总训练步数: ~2,083步
-# - 预计时间: 10-15小时
-# - GPU利用率应该提升到20-40%
+# - 航线会在5m, 10m, 15m之间变化
+# - agents不会全部停留在同一高度
+# - 高度标准差应该 > 2.0
+# - 每个episode应有15-25%的步骤包含高度变化
+#
+# 对比实验:
+# - 设置 altitude_diversity_weight: 0.0 运行基线实验
+# - 对比高度分布和路径效率的差异

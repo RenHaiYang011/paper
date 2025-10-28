@@ -30,6 +30,7 @@ class COMAWrapper:
         self.n_agents = self.params["experiment"]["missions"]["n_agents"]
         self.budget = params["experiment"]["constraints"]["budget"]
         self.class_weighting = params["experiment"]["missions"]["class_weighting"]
+        self.altitude_diversity_weight = params["experiment"].get("altitude_diversity_weight", 0.0)
         self.agent_state_space = AgentStateSpace(self.params)
         
         # Initialize networks and move to GPU
@@ -153,6 +154,7 @@ class COMAWrapper:
                     writer=self.writer,
                     global_step=global_step,
                     class_weighting=self.class_weighting,
+                    altitude_diversity_weight=self.altitude_diversity_weight,
                 )
                 batch_memory.insert(-1, agent_id, reward=relative_reward)
 
@@ -192,6 +194,7 @@ class COMAWrapper:
                 writer=self.writer,
                 global_step=global_step,
                 class_weighting=self.class_weighting,
+                altitude_diversity_weight=self.altitude_diversity_weight,
             )
 
             # log coverage delta and absolute coverage to TensorBoard if writer available
