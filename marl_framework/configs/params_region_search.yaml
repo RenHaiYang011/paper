@@ -1,0 +1,196 @@
+# 区域搜索航线规划配置
+# 基于 MARL 的多无人机协同区域搜索任务
+
+environment:
+  num_envs: 2
+  seed: 3
+  x_dim: 50
+  y_dim: 50
+
+sensor:
+  type: "rgb_camera"
+  field_of_view:
+    angle_x: 60
+    angle_y: 60
+  pixel:
+    number_x: 57
+    number_y: 57
+  encoding: "rgb8"
+  model:
+    type: "altitude_dependent"
+    coeff_a: 0.05
+    coeff_b: 0.2
+  simulation:
+    type: "random_field"
+    cluster_radius: 5
+
+mapping:
+  prior: 0.5
+
+# ==================== 区域搜索核心配置 ====================
+search_regions:
+  # 搜索区域定义 (多个感兴趣区域 ROI)
+  regions:
+    - name: "high_priority_zone"
+      type: "rectangle"  # rectangle, circle, polygon
+      priority: 1.0      # 优先级权重 (0.0-1.0)
+      min_coverage: 0.95 # 最小覆盖要求
+      coordinates:       # 矩形: [x_min, y_min, x_max, y_max]
+        - [10, 10, 25, 25]
+      search_density: "high"  # high, medium, low
+      
+    - name: "medium_priority_zone"
+      type: "rectangle"
+      priority: 0.6
+      min_coverage: 0.85
+      coordinates:
+        - [30, 10, 45, 25]
+      search_density: "medium"
+      
+    - name: "patrol_zone"
+      type: "rectangle"
+      priority: 0.3
+      min_coverage: 0.70
+      coordinates:
+        - [10, 30, 45, 45]
+      search_density: "low"
+  
+  # 搜索策略
+  strategy:
+    mode: "priority_based"  # priority_based, sequential, parallel
+    allow_overlap: false    # 是否允许多个智能体同时搜索同一区域
+    revisit_threshold: 0.1  # 重访区域的时间衰减阈值
+    completion_threshold: 0.90  # 全局搜索完成度阈值 (达到后终止)
+  
+  # 搜索密度定义 (每个密度等级需要的访问次数)
+  density_requirements:
+    high: 3    # 高密度区域需要被访问3次
+    medium: 2  # 中密度区域需要被访问2次
+    low: 1     # 低密度区域需要被访问1次
+
+experiment:
+  title: "region_search_training"
+  constraints:
+    spacing: 5
+    min_altitude: 5
+    max_altitude: 25
+    budget: 10               # 每个episode的最大步数
+    num_actions: 6
+  uav:
+    max_v: 5
+    max_a: 2
+    sampling_time: 2
+    communication_range: 25
+    fix_range: True
+    failure_rate: 0
+  missions:
+    type: "COMA"
+    mission_mode: "training"
+    n_episodes: 800
+    patience: 150
+    n_agents: 4
+    action_space: "larger"
+    planning_uncertainty: "SE"
+    eps_max: 0.5
+    eps_min: 0.02
+    eps_anneal_phase: 10000
+    use_eps: True
+    class_weighting: [0, 1]
+    reward_normalization: false
+  
+  # ==================== 区域搜索奖励权重 ====================
+  # 传统覆盖奖励 (减弱)
+  coverage_weight: 0.05         # 降低全局覆盖权重
+  distance_weight: 0.0
+  footprint_weight: 0.2         # 降低足迹权重
+  collision_weight: 2.0
+  collision_distance: 5.0
+  altitude_diversity_weight: 0.3
+  
+  # 区域搜索专用奖励
+  region_coverage_weight: 1.0   # 目标区域覆盖奖励
+  region_priority_weight: 0.8   # 优先级区域奖励
+  search_density_weight: 0.6    # 搜索密度满足奖励
+  search_completion_weight: 2.0 # 搜索完成奖励
+  redundant_search_penalty: -0.5 # 重复搜索惩罚
+  region_transition_penalty: -0.1 # 区域切换惩罚(鼓励连续搜索)
+  
+  baselines:
+    lawnmower:
+      trials: 50
+      altitude: 5
+    random:
+      n_episodes: 50
+    information_gain:
+      trials: 50
+      communication: true
+
+evaluation:
+  repetitions: 1
+  metrics:
+    - "num_waypoints"
+    - "paths"
+    - "rmse"
+    - "wrmse"
+    - "mll"
+    - "wmll"
+    - "run_time"
+    # 区域搜索专用指标
+    - "region_coverage_rate"      # 各区域覆盖率
+    - "search_efficiency"         # 搜索效率 = 覆盖面积/时间
+    - "redundant_search_ratio"    # 重复搜索率
+    - "priority_satisfaction"     # 优先级满足度
+    - "coordination_efficiency"   # 协同效率
+
+networks:
+  device: "cuda"
+  type: "CNN"
+  data_passes: 2
+  batch_size: 32
+  batch_number: 2
+  copy_rate: 10
+  gamma: 0.99
+  lambda: 0.8
+  actor:
+    hidden_dim: 128
+    learning_rate: 0.00001
+    momentum: 0.9
+    gradient_norm: 10
+  critic:
+    target_update_mode: "hard"
+    tau: 0.01
+    update_mode: "random_batches"
+    synchronization: "no"
+    fc1_dim: 64
+    learning_rate: 0.0001
+    momentum: 0.9
+    gradient_norm: 10
+
+classification:
+  n_episodes: 300
+  data_split: [0.4, 0.4, 0.2]
+  number_epochs: 100
+  batch_size: 50
+
+# ==================== 配置说明 ====================
+# 区域搜索与传统覆盖的主要区别:
+# 
+# 1. 目标明确: 
+#    - 传统: 尽可能覆盖整个地图
+#    - 区域搜索: 重点覆盖指定的感兴趣区域 (ROI)
+#
+# 2. 优先级管理:
+#    - 高优先级区域获得更多奖励
+#    - 低优先级区域可以牺牲覆盖率
+#
+# 3. 搜索密度:
+#    - 某些区域需要多次访问(细致搜索)
+#    - 某些区域只需要快速扫描
+#
+# 4. 协同策略:
+#    - 避免多个无人机搜索同一区域(浪费)
+#    - 分工明确,提高整体效率
+#
+# 5. 终止条件:
+#    - 传统: budget 用完
+#    - 区域搜索: 达到 completion_threshold 或 budget 用完
