@@ -33,15 +33,15 @@ if [ -n "$ALL_PROCS" ]; then
         cmd=$(echo "$line" | awk '{print $6}')
 
         # 获取进程用户 (在 shell 中执行,避免在 awk 中嵌套shell)
-        user=$(ps -o user= -p "$pid" 2>/dev/null || echo "unknown")
+        user=$(ps -o user= -p "$pid" 2>/dev/null | tr -d ' ' || echo "unknown")
 
         if [ "$user" = "$(whoami)" ]; then
-            printf "✓ [我的] "
+            printf "✓ [我的]     "
         else
-            printf "  [%s] ", "$user"
+            printf "  [%-12s] " "$user"
         fi
 
-        printf "GPU %s | PID: %s | Type: %s | GPU Util: %s%% | Mem: %sMB | CMD: %s\n", "$gpu", "$pid", "$type", "$sm", "$mem", "$cmd"
+        printf "GPU %s | PID: %s | Type: %s | GPU Util: %s%% | Mem: %sMB | CMD: %s\n" "$gpu" "$pid" "$type" "$sm" "$mem" "$cmd"
     done
 else
     echo "  (当前没有 GPU 进程)"
