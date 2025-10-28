@@ -281,6 +281,9 @@ CONFIG_FILE_PATH=configs/params_balanced.yaml ./train_with_backup.sh production_
 # 3. 最终模型 (可选,如果需要最佳性能)
 CONFIG_FILE_PATH=configs/params.yaml ./train_with_backup.sh final_model
 # 预期: 40-80 小时, 性能 100%
+
+# 清理备份模型数据 ** 解决配置变更问题
+./clean_models_for_new_config.sh
 ```
 
 ### 实验命名规范
@@ -298,7 +301,10 @@ CONFIG_FILE_PATH=configs/params.yaml ./train_with_backup.sh final_model
 ```bash
 # 实时监控 GPU (推荐使用项目脚本)
 cd marl_framework/scripts
-watch -n 2 ./monitor_training.sh
+# 使用 watch 持续监控
+watch -n 2 './monitor_training_simple.sh'
+# 直接运行,查看详细信息
+./monitor_training.sh
 
 # 或使用原生命令
 watch -n 1 nvidia-smi

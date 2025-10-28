@@ -1,8 +1,13 @@
 #!/bin/bash
 # 训练进程监控脚本
 # 用途: 实时监控 GPU 使用情况和训练进程状态
+# 使用: ./monitor_training.sh [--no-clear]
 
-clear
+# 只在直接运行时清屏,watch 模式下不清屏
+if [ "$1" != "--no-clear" ]; then
+    clear
+fi
+
 echo "=========================================="
 echo "  训练进程监控"
 echo "  按 Ctrl+C 退出"
