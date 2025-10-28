@@ -13,9 +13,9 @@ class AgentStateSpace:
         self.spacing = params["experiment"]["constraints"]["spacing"]
         self.min_altitude = params["experiment"]["constraints"]["min_altitude"]
         self.max_altitude = params["experiment"]["constraints"]["max_altitude"]
-        self.space_x_dim = params["environment"]["x_dim"] // self.spacing + 1
-        self.space_y_dim = params["environment"]["y_dim"] // self.spacing + 1
-        self.space_z_dim = (self.max_altitude - self.min_altitude) // self.spacing + 1
+        self.space_x_dim = int(params["environment"]["x_dim"] // self.spacing + 1)
+        self.space_y_dim = int(params["environment"]["y_dim"] // self.spacing + 1)
+        self.space_z_dim = int((self.max_altitude - self.min_altitude) // self.spacing + 1)
         self.space_dim = np.array(
             [self.space_x_dim, self.space_y_dim, self.space_z_dim]
         )

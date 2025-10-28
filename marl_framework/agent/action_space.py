@@ -14,7 +14,7 @@ class AgentActionSpace:
         self.max_altitude = params["experiment"]["constraints"]["max_altitude"]
         self.space_x_dim = 3
         self.space_y_dim = 3
-        self.space_z_dim = (self.max_altitude - self.min_altitude) // self.spacing + 1
+        self.space_z_dim = int((self.max_altitude - self.min_altitude) // self.spacing + 1)
         self.num_actions = params["experiment"]["constraints"]["num_actions"]
         self.environment_x_dim = params["environment"]["x_dim"]
         self.environment_y_dim = params["environment"]["y_dim"]
