@@ -29,7 +29,8 @@ class AgentStateSpace:
         r = np.random.RandomState(seed=self.seed * episode * agent_id)
         state_x = self.spacing * r.randint(0, self.space_x_dim)
         state_y = self.spacing * r.randint(0, self.space_y_dim)
-        state_z = 15  # self.spacing * r.randint(1, self.space_z_dim + 1)
+        # Use middle altitude instead of hardcoded 15
+        state_z = self.min_altitude + self.spacing * (self.space_z_dim // 2)  # middle altitude layer
 
         # if agent_id == 0:
         #     state_x = 10
@@ -51,9 +52,9 @@ class AgentStateSpace:
         return np.array([state_x, state_y, state_z])
 
     def position_to_index(self, position):
-        state_x = position[0] // self.spacing
-        state_y = position[1] // self.spacing
-        state_z = (position[2] // self.spacing) - 1
+        state_x = int(position[0] // self.spacing)
+        state_y = int(position[1] // self.spacing)
+        state_z = int((position[2] // self.spacing) - 1)
         return np.array([state_x, state_y, state_z])
 
     def index_to_position(self, state):
