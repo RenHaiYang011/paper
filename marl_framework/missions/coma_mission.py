@@ -536,6 +536,87 @@ class COMAMission(Mission):
                 np.array(critic_metrics[-1][5]),
                 self.training_step_idx,
             )
+        
+        # ==================== Region Search Statistics ====================
+        if self.search_region_manager is not None:
+            try:
+                stats = self.search_region_manager.get_search_statistics()
+                
+                # Global metrics
+                self.writer.add_scalar(
+                    f"{self.mode}RegionSearch/Global_Completion",
+                    stats['global_completion'],
+                    self.training_step_idx,
+                )
+                self.writer.add_scalar(
+                    f"{self.mode}RegionSearch/Total_Visits",
+                    stats['total_visits'],
+                    self.training_step_idx,
+                )
+                self.writer.add_scalar(
+                    f"{self.mode}RegionSearch/Covered_Cells",
+                    stats['covered_cells'],
+                    self.training_step_idx,
+                )
+                
+                # Per-region metrics
+                for region_stat in stats['regions']:
+                    region_name = region_stat['name']
+                    self.writer.add_scalar(
+                        f"{self.mode}RegionSearch/{region_name}/Coverage",
+                        region_stat['coverage'],
+                        self.training_step_idx,
+                    )
+                    self.writer.add_scalar(
+                        f"{self.mode}RegionSearch/{region_name}/Priority",
+                        region_stat['priority'],
+                        self.training_step_idx,
+                    )
+                    self.writer.add_scalar(
+                        f"{self.mode}RegionSearch/{region_name}/Avg_Visits",
+                        region_stat['avg_visits'],
+                        self.training_step_idx,
+                    )
+                    # Status as binary (completed=1, in_progress=0)
+                    status_val = 1.0 if region_stat['status'] == 'completed' else 0.0
+                    self.writer.add_scalar(
+                        f"{self.mode}RegionSearch/{region_name}/Completed",
+                        status_val,
+                        self.training_step_idx,
+                    )
+                
+                # Calculate search efficiency: covered cells per total visits
+                if stats['total_visits'] > 0:
+                    search_efficiency = stats['covered_cells'] / stats['total_visits']
+                    self.writer.add_scalar(
+                        f"{self.mode}RegionSearch/Search_Efficiency",
+                        search_efficiency,
+                        self.training_step_idx,
+                    )
+                
+                # Calculate priority satisfaction: weighted completion by priority
+                total_priority = sum(r['priority'] for r in stats['regions'])
+                if total_priority > 0:
+                    priority_satisfaction = sum(
+                        r['coverage'] * r['priority'] for r in stats['regions']
+                    ) / total_priority
+                    self.writer.add_scalar(
+                        f"{self.mode}RegionSearch/Priority_Satisfaction",
+                        priority_satisfaction,
+                        self.training_step_idx,
+                    )
+                
+                # Calculate redundant search rate: (total_visits - covered_cells) / total_visits
+                if stats['total_visits'] > 0:
+                    redundant_rate = (stats['total_visits'] - stats['covered_cells']) / stats['total_visits']
+                    self.writer.add_scalar(
+                        f"{self.mode}RegionSearch/Redundant_Search_Rate",
+                        redundant_rate,
+                        self.training_step_idx,
+                    )
+                
+            except Exception as e:
+                logger.warning(f"Failed to log region search statistics: {e}")
 
     def save_best_model(self, actor_network):
         running_mean_return = sum(self.episode_returns) / len(self.episode_returns)
