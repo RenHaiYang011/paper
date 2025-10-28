@@ -54,7 +54,7 @@ class Simulation:
     def get_noisy_map_section(sensor_noise, map_section, mode):
         accuracy = 1 - sensor_noise
         correctness = torch.bernoulli(
-                torch.full(np.shape(map_section), 1 - sensor_noise)
+                torch.full(np.shape(map_section), 1 - sensor_noise, dtype=torch.float32)
             )
         correctness = (
                 torch.reshape(correctness, np.shape(map_section)).cpu().numpy()
