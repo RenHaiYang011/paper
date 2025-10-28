@@ -17,7 +17,15 @@ class ActorNetwork(nn.Module):
         self.hidden_dim = self.params["networks"]["actor"]["hidden_dim"]
         self.n_actions = self.params["experiment"]["constraints"]["num_actions"]
 
-        self.conv1 = nn.Conv2d(7, 256, (5, 5))
+        # Determine input channels: 7 base + 3 region search (if search_regions in config)
+        self.input_channels = 7
+        if "search_regions" in self.params:
+            self.input_channels = 10  # Add 3 region search feature channels
+            logger.info(f"Actor network using {self.input_channels} input channels (with region search features)")
+        else:
+            logger.info(f"Actor network using {self.input_channels} input channels (base features only)")
+        
+        self.conv1 = nn.Conv2d(self.input_channels, 256, (5, 5))
         self.conv2 = nn.Conv2d(256, 256, (4, 4))
         self.conv3 = nn.Conv2d(256, 256, (4, 4))
         # self.conv4 = nn.Conv2d(128, 256, (3, 3))

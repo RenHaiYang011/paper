@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import numpy as np
 import cv2
@@ -7,6 +7,7 @@ import torch
 
 from agent.state_space import AgentStateSpace
 from utils.state import get_w_entropy_map
+from mapping.search_regions import SearchRegionManager
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ def get_network_input(
     params,
     batch_memory,
     agent_state_space,
+    search_region_manager: Optional[SearchRegionManager] = None,
 ):
     total_budget = params["experiment"]["constraints"]["budget"]
     spacing = params["experiment"]["constraints"]["spacing"]
@@ -44,19 +46,30 @@ def get_network_input(
     )
     agent_id_map = get_agent_id_map(agent_id, position_map, params)
     footprint_map = get_footprint_map(local_information, agent_id, agent_state_space, t)
-    observation_map = torch.tensor(
-        np.dstack(
-            [
-                budget_map,
-                agent_id_map,
-                position_map,
-                w_entropy_map,
-                local_w_entropy_map,
-                prob_map,
-                footprint_map,
-            ]
+    
+    # Base observation layers (original 7 layers)
+    base_layers = [
+        budget_map,
+        agent_id_map,
+        position_map,
+        w_entropy_map,
+        local_w_entropy_map,
+        prob_map,
+        footprint_map,
+    ]
+    
+    # Add region search features if available (3 additional layers)
+    if search_region_manager is not None:
+        region_features = get_region_search_features(
+            local_information, agent_id, agent_state_space, position_map, search_region_manager
         )
-    )
+        base_layers.extend([
+            region_features['region_priority_map'],
+            region_features['region_distance_map'],
+            region_features['search_completion_map'],
+        ])
+    
+    observation_map = torch.tensor(np.dstack(base_layers))
 
     return observation_map
 
@@ -191,3 +204,69 @@ def get_previous_action_map(agent_id, batch_memory, t, params: Dict):
                     n_actions - 1
                 )
     return action
+
+
+def get_region_search_features(
+    local_information: Dict,
+    agent_id: int,
+    agent_state_space: AgentStateSpace,
+    position_map: np.array,
+    search_region_manager: Optional[SearchRegionManager] = None,
+) -> Dict[str, np.array]:
+    """
+    Get region search related feature maps
+    
+    Returns:
+        Dict containing:
+        - region_priority_map: Current region priority (0-1, or 0 if not in region)
+        - region_distance_map: Normalized distance to nearest unsearched region
+        - search_completion_map: Global search completion percentage
+    """
+    features = {
+        'region_priority_map': np.zeros_like(position_map),
+        'region_distance_map': np.zeros_like(position_map),
+        'search_completion_map': np.zeros_like(position_map),
+    }
+    
+    if search_region_manager is None:
+        # Return zero maps if no region search
+        return features
+    
+    try:
+        # Get agent position
+        own_position = local_information[agent_id]["position"]
+        position_array = np.array(own_position)
+        
+        # 1. Current region priority
+        current_region = search_region_manager.get_region_at_position(position_array)
+        if current_region is not None:
+            priority = current_region.priority
+        else:
+            priority = 0.0
+        features['region_priority_map'] = np.ones_like(position_map) * priority
+        
+        # 2. Distance to nearest unsearched region
+        nearest_region = search_region_manager.get_nearest_unsearched_region(position_array)
+        if nearest_region is not None:
+            region_center = search_region_manager._get_region_center(nearest_region)
+            # Calculate distance
+            distance = np.linalg.norm(position_array[:2] - region_center)
+            # Normalize by map diagonal
+            map_diagonal = np.sqrt(
+                (agent_state_space.space_x_dim * agent_state_space.spacing) ** 2 +
+                (agent_state_space.space_y_dim * agent_state_space.spacing) ** 2
+            )
+            normalized_distance = min(distance / map_diagonal, 1.0)
+        else:
+            # All regions searched
+            normalized_distance = 0.0
+        features['region_distance_map'] = np.ones_like(position_map) * normalized_distance
+        
+        # 3. Global search completion
+        completion = search_region_manager.get_search_completion()
+        features['search_completion_map'] = np.ones_like(position_map) * completion
+        
+    except Exception as e:
+        logger.warning(f"Failed to calculate region search features: {e}")
+    
+    return features

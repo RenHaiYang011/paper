@@ -91,6 +91,7 @@ class COMAWrapper:
                 params,
                 batch_memory,
                 self.agent_state_space,
+                self.search_region_manager,  # Pass search_region_manager
             )
 
             batch_memory.add(agent_id, observation=observation)
