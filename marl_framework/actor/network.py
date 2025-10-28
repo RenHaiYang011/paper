@@ -17,13 +17,25 @@ class ActorNetwork(nn.Module):
         self.hidden_dim = self.params["networks"]["actor"]["hidden_dim"]
         self.n_actions = self.params["experiment"]["constraints"]["num_actions"]
 
-        # Determine input channels: 7 base + 3 region search (if search_regions in config)
+        # Determine input channels dynamically based on configuration
+        # Base: 7 channels
+        # + Region search: 3 channels (region_priority, region_distance, search_completion)
+        # + Frontier detection: 1 channel (frontier_map)
         self.input_channels = 7
+        
         if "search_regions" in self.params:
-            self.input_channels = 10  # Add 3 region search feature channels
-            logger.info(f"Actor network using {self.input_channels} input channels (with region search features)")
-        else:
-            logger.info(f"Actor network using {self.input_channels} input channels (base features only)")
+            self.input_channels += 3  # Add region search features
+            logger.info("Actor network: Adding 3 region search feature channels")
+        
+        # Check if frontier-based intrinsic rewards are enabled
+        intrinsic_rewards_config = self.params.get("experiment", {}).get("intrinsic_rewards", {})
+        if intrinsic_rewards_config.get("enable", False) and intrinsic_rewards_config.get("frontier_reward_weight", 0) > 0:
+            state_repr_config = self.params.get("state_representation", {})
+            if state_repr_config.get("use_frontier_map", False):
+                self.input_channels += 1  # Add frontier map
+                logger.info("Actor network: Adding 1 frontier map channel")
+        
+        logger.info(f"Actor network initialized with {self.input_channels} input channels")
         
         self.conv1 = nn.Conv2d(self.input_channels, 256, (5, 5))
         self.conv2 = nn.Conv2d(256, 256, (4, 4))

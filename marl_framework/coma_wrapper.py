@@ -12,6 +12,7 @@ from marl_framework.agent.state_space import AgentStateSpace
 from marl_framework.critic.learner import CriticLearner
 from marl_framework.critic.network import CriticNetwork
 from marl_framework.mapping.search_regions import SearchRegionManager
+from marl_framework.mapping.frontier_detection import FrontierManager
 
 from actor.transformations import get_network_input as get_actor_input
 from critic.transformations import get_network_input as get_critic_input
@@ -42,6 +43,13 @@ class COMAWrapper:
         self.search_completion_weight = params["experiment"].get("search_completion_weight", 0.0)
         self.redundant_search_penalty = params["experiment"].get("redundant_search_penalty", 0.0)
         self.region_transition_penalty = params["experiment"].get("region_transition_penalty", 0.0)
+        
+        # Frontier-based intrinsic reward parameters
+        self.frontier_manager: Optional[FrontierManager] = None
+        intrinsic_rewards = params.get("experiment", {}).get("intrinsic_rewards", {})
+        if intrinsic_rewards.get("enable", False):
+            self.frontier_manager = FrontierManager(params)
+            logger.info("FrontierManager initialized for intrinsic rewards")
         
         # Initialize networks and move to GPU
         import constants
@@ -92,6 +100,7 @@ class COMAWrapper:
                 batch_memory,
                 self.agent_state_space,
                 self.search_region_manager,  # Pass search_region_manager
+                self.frontier_manager,  # Pass frontier_manager
             )
 
             batch_memory.add(agent_id, observation=observation)
@@ -124,6 +133,14 @@ class COMAWrapper:
         critic_map_knowledge = mapping.fuse_map(
             accumulated_map_knowledge, global_information, mode, "global"
         )
+        
+        # Update frontier map based on current coverage
+        if self.frontier_manager is not None and self.frontier_manager.enabled:
+            try:
+                # Use the fused map as coverage map
+                self.frontier_manager.update(critic_map_knowledge)
+            except Exception as e:
+                logger.warning(f"Failed to update frontier manager: {e}")
 
         for agent_id in range(self.n_agents):
             next_map, next_position, eps, action, footprint_idx, map2communicate = agents[
@@ -220,6 +237,9 @@ class COMAWrapper:
                 redundant_search_penalty=self.redundant_search_penalty,
                 region_transition_penalty=self.region_transition_penalty,
                 sensor_footprint=None,  # TODO: get actual sensor footprint
+                # Frontier-based intrinsic reward parameters
+                frontier_manager=self.frontier_manager,
+                spacing=self.params["experiment"]["constraints"]["spacing"],
             )
 
             # log coverage delta and absolute coverage to TensorBoard if writer available

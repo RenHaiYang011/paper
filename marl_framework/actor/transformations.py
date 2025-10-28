@@ -8,6 +8,7 @@ import torch
 from agent.state_space import AgentStateSpace
 from utils.state import get_w_entropy_map
 from mapping.search_regions import SearchRegionManager
+from mapping.frontier_detection import FrontierManager
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,7 @@ def get_network_input(
     batch_memory,
     agent_state_space,
     search_region_manager: Optional[SearchRegionManager] = None,
+    frontier_manager: Optional[FrontierManager] = None,
 ):
     total_budget = params["experiment"]["constraints"]["budget"]
     spacing = params["experiment"]["constraints"]["spacing"]
@@ -68,6 +70,13 @@ def get_network_input(
             region_features['region_distance_map'],
             region_features['search_completion_map'],
         ])
+    
+    # Add frontier map if available (1 additional layer)
+    if frontier_manager is not None and frontier_manager.enabled:
+        frontier_feature = get_frontier_feature_map(
+            frontier_manager, agent_state_space, position_map
+        )
+        base_layers.append(frontier_feature)
     
     observation_map = torch.tensor(np.dstack(base_layers))
 
@@ -270,3 +279,45 @@ def get_region_search_features(
         logger.warning(f"Failed to calculate region search features: {e}")
     
     return features
+
+
+def get_frontier_feature_map(
+    frontier_manager: FrontierManager,
+    agent_state_space: AgentStateSpace,
+    position_map: np.array,
+) -> np.array:
+    """
+    Get frontier map as a feature layer for the agent observation
+    
+    The frontier map shows the boundary between explored and unexplored regions,
+    helping the agent decide where to explore next.
+    
+    Args:
+        frontier_manager: FrontierManager instance with current frontier map
+        agent_state_space: Agent state space for map dimensions
+        position_map: Reference map for shape
+    
+    Returns:
+        frontier_feature_map: Resized frontier map (0-1), same shape as position_map
+    """
+    try:
+        # Get current frontier map from manager
+        frontier_map = frontier_manager.get_frontier_map()
+        
+        if frontier_map is None or frontier_map.size == 0:
+            # Return zero map if no frontier available
+            return np.zeros_like(position_map)
+        
+        # Resize frontier map to match agent observation space
+        frontier_resized = cv2.resize(
+            frontier_map,
+            (position_map.shape[1], position_map.shape[0]),
+            interpolation=cv2.INTER_AREA
+        )
+        
+        return frontier_resized
+        
+    except Exception as e:
+        logger.warning(f"Failed to get frontier feature map: {e}")
+        return np.zeros_like(position_map)
+

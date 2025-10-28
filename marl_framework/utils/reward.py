@@ -5,6 +5,7 @@ import torch
 from marl_framework.agent.state_space import AgentStateSpace
 from marl_framework.utils.state import get_w_entropy_map
 from marl_framework.mapping.search_regions import SearchRegionManager
+from marl_framework.mapping.frontier_detection import FrontierManager
 
 from utils.utils import compute_euclidean_distance, compute_coverage
 
@@ -40,6 +41,9 @@ def get_global_reward(
     redundant_search_penalty: float = 0.0,
     region_transition_penalty: float = 0.0,
     sensor_footprint: np.ndarray = None,
+    # Frontier-based intrinsic reward parameters
+    frontier_manager: FrontierManager = None,
+    spacing: float = 5.0,
 ):
     done = False
     reward = 0
@@ -172,6 +176,25 @@ def get_global_reward(
         # Don't fail reward computation if region search fails
         pass
 
+    # ==================== Frontier-Based Intrinsic Reward ====================
+    frontier_reward = 0.0
+    try:
+        if frontier_manager is not None and agent_id is not None and frontier_manager.enabled:
+            # Get current position for this agent
+            if next_positions is not None and len(next_positions) > agent_id:
+                current_pos = np.array(next_positions[agent_id])
+                
+                # Calculate frontier reward based on distance to nearest frontier
+                frontier_reward = frontier_manager.calculate_frontier_reward(
+                    current_pos, spacing
+                )
+                
+                # Add to absolute reward
+                absolute_reward += frontier_reward
+    except Exception as e:
+        # Don't fail reward computation if frontier reward fails
+        frontier_reward = 0.0
+
     # Log individual penalty components to TensorBoard if writer provided
     try:
         if writer is not None:
@@ -194,6 +217,17 @@ def get_global_reward(
             if search_region_manager is not None:
                 completion = search_region_manager.get_search_completion()
                 writer.add_scalar('RegionSearch/Completion_Percentage', completion * 100, global_step)
+            
+            # Frontier-based intrinsic reward
+            writer.add_scalar('IntrinsicRewards/Frontier_Reward', float(frontier_reward), global_step)
+            
+            # Frontier statistics (if available)
+            if frontier_manager is not None and frontier_manager.enabled:
+                frontier_stats = frontier_manager.get_statistics()
+                writer.add_scalar('Frontier/Current_Points', frontier_stats['current_frontier_points'], global_step)
+                if 'frontier_reward' in frontier_stats:
+                    writer.add_scalar('Frontier/Avg_Reward', frontier_stats['frontier_reward']['avg_frontier_reward'], global_step)
+                    writer.add_scalar('Frontier/Total_Reward', frontier_stats['frontier_reward']['total_frontier_reward'], global_step)
     except Exception:
         # do not raise from logging
         pass
