@@ -109,8 +109,8 @@ class Agent:
             and position[0] >= 0
             and position[1] <= self.y_dim
             and position[1] >= 0
-            and position[2] >= 5
-            and position[2] <= 15
+            and position[2] >= self.agent_state_space.min_altitude
+            and position[2] <= self.agent_state_space.max_altitude
         ):
             return True
         else:
