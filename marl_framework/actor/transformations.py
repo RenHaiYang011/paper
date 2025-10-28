@@ -23,6 +23,7 @@ def get_network_input(
 ):
     total_budget = params["experiment"]["constraints"]["budget"]
     spacing = params["experiment"]["constraints"]["spacing"]
+    class_weighting = params["experiment"]["missions"]["class_weighting"]
 
     position_map, position = get_position_feature_map(
         local_information, agent_id, agent_state_space, params
@@ -34,6 +35,7 @@ def get_network_input(
         simulated_map,
         "actor",
         agent_state_space,
+        class_weighting,
     )
 
     budget_map = get_budget_feature_map(total_budget - t, position_map, params)

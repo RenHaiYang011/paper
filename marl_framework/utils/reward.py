@@ -28,6 +28,7 @@ def get_global_reward(
     writer=None,
     global_step=None,
     collision_distance=1.0,
+    class_weighting: list = None,
 ):
     done = False
     reward = 0
@@ -40,7 +41,7 @@ def get_global_reward(
     fp_factor = 1
 
     absolute_utility_reward, relative_utility_reward = get_utility_reward(
-        last_map, next_map, simulated_map, agent_state_space, coverage_weight
+        last_map, next_map, simulated_map, agent_state_space, coverage_weight, class_weighting
     )
 
     # distance penalty (average over agents) — applied on utility level before scaling
@@ -124,11 +125,12 @@ def get_utility_reward(
     simulated_map: np.array,
     agent_state_space: AgentStateSpace,
     coverage_weight: float = None,
+    class_weighting: list = None,
 ):
     entropy_before = get_w_entropy_map(
-        None, state, simulated_map, "reward", agent_state_space
+        None, state, simulated_map, "reward", agent_state_space, class_weighting
     )[2]
-    output = get_w_entropy_map(None, state_, simulated_map, "reward", agent_state_space)
+    output = get_w_entropy_map(None, state_, simulated_map, "reward", agent_state_space, class_weighting)
     entropy_after = output[2]
     entropy_reduction = entropy_before - entropy_after
 

@@ -54,7 +54,7 @@ experiment:
     eps_min: 0.02
     eps_anneal_phase: 10000
     use_eps: True
-    class_weighting: [0, 1]
+    class_weighting: [0, 1] 
     reward_normalization: false
   coverage_weight: 0.15
   distance_weight: 0.0

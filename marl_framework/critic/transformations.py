@@ -27,6 +27,7 @@ def get_network_input(
     agent_action_space = AgentActionSpace(params)
     network_type = params["networks"]["type"]
     n_agents = params["experiment"]["missions"]["n_agents"]
+    class_weighting = params["experiment"]["missions"]["class_weighting"]
 
     position_map = get_position_feature_map(
         network_type,
@@ -37,7 +38,7 @@ def get_network_input(
         n_agents,
     )
     w_entropy_map, weightings_map, entropy_map, _, prob_map = get_w_entropy_map(
-        None, accumulated_map_knowledge, simulated_map, "global", agent_state_space
+        None, accumulated_map_knowledge, simulated_map, "global", agent_state_space, class_weighting
     )
 
     other_actions_map = get_other_actions_map(

@@ -17,6 +17,7 @@ def get_w_entropy_map(
     simulated_map: np.array,
     observability: str,
     agent_state_space: AgentStateSpace,
+    class_weighting: list = None,
 ):
     if observability != "reward" and observability != "eval":
         grid_map = cv2.resize(
@@ -44,7 +45,7 @@ def get_w_entropy_map(
         grid_map = local_map.copy()
 
     feature_map = calculate_w_entropy(
-        grid_map, map_footprint, simulated_map, observability, agent_state_space
+        grid_map, map_footprint, simulated_map, observability, agent_state_space, class_weighting
     )
 
     return feature_map
@@ -56,8 +57,11 @@ def calculate_w_entropy(
     simulated_map: np.array,
     observability: str,
     agent_state_space: AgentStateSpace,
+    class_weighting: list = None,
 ):
-    class_weighting = [0, 1]
+    # 使用传入的 class_weighting，如果为 None 则使用默认值 [0, 1]
+    if class_weighting is None:
+        class_weighting = [0, 1]
 
     if observability == "eval":  # use ground truth for evaluation
         target = copy.deepcopy(simulated_map)
