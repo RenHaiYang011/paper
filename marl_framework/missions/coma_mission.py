@@ -166,6 +166,11 @@ class COMAMission(Mission):
                 batch_memory.clear()
                 self.episode_returns.append(episode_return)
                 self.save_best_model(actor_network)
+                
+                # Periodically flush TensorBoard data to ensure it's saved
+                if self.training_step_idx % 20 == 0:
+                    self.writer.flush()
+                    
                 episode_returns = []
                 episode_reward_list = []
                 absolute_returns = []
@@ -225,6 +230,15 @@ class COMAMission(Mission):
                     chosen_actions = []
                     chosen_altitudes = []
 
+        # Ensure TensorBoard data is flushed to disk
+        logger.info("Training completed. Flushing TensorBoard data...")
+        self.writer.flush()
+        self.writer.close()
+        logger.info("TensorBoard data saved successfully.")
+        
+        # Save training results to res/ folder
+        self.save_training_results()
+        
         return self.max_mean_episode_return
 
     def _safe_add_histogram(self, tag: str, values, step: int):
@@ -645,3 +659,64 @@ class COMAMission(Mission):
             torch.save(
                 actor_network, os.path.join(constants.LOG_DIR, "best_model_600.pth")
             )
+
+    def save_training_results(self):
+        """Save training results and metrics to res/ folder"""
+        import json
+        import csv
+        from datetime import datetime
+        
+        # Create res directory if it doesn't exist
+        res_dir = os.path.join(constants.REPO_DIR, "res")
+        os.makedirs(res_dir, exist_ok=True)
+        
+        # Create timestamp for unique filenames
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Prepare training summary data
+        training_summary = {
+            "timestamp": timestamp,
+            "total_training_steps": self.total_training_steps,
+            "final_training_step": self.training_step_idx,
+            "max_mean_episode_return": float(self.max_mean_episode_return),
+            "final_episode_returns_mean": float(np.mean(self.episode_returns)) if self.episode_returns else 0.0,
+            "final_episode_returns_std": float(np.std(self.episode_returns)) if self.episode_returns else 0.0,
+            "total_episodes": len(self.episode_returns),
+            "collision_returns_mean": float(np.mean(self.collision_returns)) if self.collision_returns else 0.0,
+            "utility_returns_mean": float(np.mean(self.utility_returns)) if self.utility_returns else 0.0,
+            "params": {
+                "n_agents": self.n_agents,
+                "budget": self.budget,
+                "batch_size": self.batch_size,
+                "batch_number": self.batch_number,
+                "n_actions": self.n_actions
+            }
+        }
+        
+        # Save training summary as JSON
+        summary_file = os.path.join(res_dir, f"training_summary_{timestamp}.json")
+        with open(summary_file, 'w', encoding='utf-8') as f:
+            json.dump(training_summary, f, indent=2, ensure_ascii=False)
+        logger.info(f"Training summary saved: {summary_file}")
+        
+        # Save episode returns as CSV using standard library
+        if self.episode_returns:
+            returns_file = os.path.join(res_dir, f"episode_returns_{timestamp}.csv")
+            with open(returns_file, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                writer.writerow(['episode', 'episode_return', 'collision_return', 'utility_return'])
+                
+                for i, ep_return in enumerate(self.episode_returns):
+                    collision_return = self.collision_returns[i] if i < len(self.collision_returns) else 0
+                    utility_return = self.utility_returns[i] if i < len(self.utility_returns) else 0
+                    writer.writerow([i+1, ep_return, collision_return, utility_return])
+                    
+            logger.info(f"Episode returns saved: {returns_file}")
+        
+        # Save configuration snapshot
+        config_file = os.path.join(res_dir, f"config_snapshot_{timestamp}.json") 
+        with open(config_file, 'w', encoding='utf-8') as f:
+            json.dump(self.params, f, indent=2, ensure_ascii=False, default=str)
+        logger.info(f"Configuration snapshot saved: {config_file}")
+        
+        logger.info(f"All training results saved to: {res_dir}")
