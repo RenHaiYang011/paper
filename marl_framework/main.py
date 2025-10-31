@@ -11,21 +11,24 @@ from missions.mission_factories import MissionFactory
 from params import load_params
 
 def main():
-    # Setup logger first (with basic configuration)
-    logger = setup_logger()
-    
-    constants.log_env_variables()
+    # 首先加载参数和设置路径
     params = load_params(constants.CONFIG_FILE_PATH)
     
     # Setup paths based on configuration
     constants.setup_paths(params)
     
-    # Re-setup logger with correct paths
+    # 然后设置logger（只设置一次，使用正确的路径）
     logger = setup_logger()
     
+    # 记录环境信息
+    constants.log_env_variables()
+    
+    logger.info(f"🚀 MARL Framework starting...")
     logger.info(f"📁 Directories configured:")
     logger.info(f"  - Log directory: {constants.LOG_DIR}")
-    logger.info(f"  - Results directory: {constants.EXPERIMENTS_FOLDER}") 
+    logger.info(f"  - Results directory: {constants.EXPERIMENTS_FOLDER}")
+    logger.info(f"🐧 Operating system: {os.name}")
+    logger.info(f"🐍 Python version: {sys.version}")
 
     # Set device
     if torch.cuda.is_available() and params["networks"]["device"] == "cuda":
