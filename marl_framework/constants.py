@@ -44,9 +44,12 @@ CHECKPOINTS_DIR = os.path.join(REPO_DIR, CHECKPOINTS_DIR)
 TRAIN_DATA_DIR = load_from_env("TRAIN_DATA_DIR", str, "generated_train_data")
 TRAIN_DATA_DIR = os.path.join(REPO_DIR, TRAIN_DATA_DIR)
 
-# 路径将在load_params后动态设置
-EXPERIMENTS_FOLDER = None
-LOG_DIR = None
+# 默认路径，可以通过setup_paths()函数重新配置
+EXPERIMENTS_FOLDER = load_from_env("EXPERIMENT_FILE_PATH", str, "res")
+EXPERIMENTS_FOLDER = os.path.join(REPO_DIR, EXPERIMENTS_FOLDER)
+
+LOG_DIR = load_from_env("LOG_DIR", str, "log")
+LOG_DIR = os.path.join(REPO_DIR, LOG_DIR)
 LOG_LEVEL = logging.DEBUG
 
 DATASETS_DIR = load_from_env("DATASETS_DIR", str, "datasets")
