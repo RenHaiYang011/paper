@@ -8,7 +8,8 @@ from marl_framework.constants import MISSION_TYPES, MissionType, LOG_DIR
 from marl_framework.missions.coma_mission import COMAMission
 from marl_framework.missions.missions import Mission
 
-logger = logging.getLogger(__name__)
+# Get the logger that was set up in main
+logger = logging.getLogger("marl_framework")
 
 
 class MissionFactory:

@@ -21,7 +21,8 @@ from sensors import Sensor
 from sensors.models import SensorModel
 from utils.plotting import plot_trajectories
 
-logger = logging.getLogger(__name__)
+# Get the logger that was set up in main
+logger = logging.getLogger("marl_framework")
 
 
 class COMAMission(Mission):
