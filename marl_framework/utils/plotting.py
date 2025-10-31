@@ -75,7 +75,13 @@ def plot_trajectories(
 
     # Use actual simulated_map shape instead of hardcoded (493, 493)
     map_height, map_width = simulated_map.shape
-    Y, X = np.meshgrid(range(0, map_width), range(0, map_height))
+    
+    # Create coordinate meshgrid in world coordinates (0-50 range)
+    # Scale the meshgrid to match the actual world coordinate system
+    world_x = np.linspace(0, 50, map_width)
+    world_y = np.linspace(0, 50, map_height)
+    Y, X = np.meshgrid(world_x, world_y)
+    
     ax.plot_surface(
         Y,
         X,
@@ -90,17 +96,18 @@ def plot_trajectories(
         y = []
         z = []
         for positions in agent_positions:
-            x.append(positions[agent_id][0] / resolution)
-            y.append(positions[agent_id][1] / resolution)
+            # Use world coordinates directly (no resolution division needed)
+            x.append(positions[agent_id][0])
+            y.append(positions[agent_id][1])
             z.append(positions[agent_id][2])
 
         ax.plot(y, x, z, color=colors[agent_id], linestyle="-", linewidth=6, zorder=100)
         # ax.plot(y[0], x[0], color=colors[agent_id], marker="o", markersize=14)
     ax.view_init(40, 50)
 
-    # Use dynamic limits based on actual map and altitude range
-    ax.set_xlim(0, map_width)
-    ax.set_ylim(0, map_height)
+    # Use dynamic limits based on world coordinate system (0-50)
+    ax.set_xlim(0, 50)
+    ax.set_ylim(0, 50)
     
     # Get altitude range from agent positions
     all_altitudes = [pos[agent_id][2] for agent_id in range(n_agents) for pos in agent_positions]
@@ -120,12 +127,10 @@ def plot_trajectories(
         ax.set_zlim(0, 30)  # fallback
         ax.set_zticks([0, 10, 20, 30])
     
-    # Set x/y ticks dynamically
-    x_step = map_width // 5
-    y_step = map_height // 5
-    ax.set_xticks([i * x_step for i in range(6)])
+    # Set x/y ticks to match world coordinates (0-50)
+    ax.set_xticks([0, 10, 20, 30, 40, 50])
     ax.set_xticklabels([0, 10, 20, 30, 40, 50])
-    ax.set_yticks([i * y_step for i in range(6)])
+    ax.set_yticks([0, 10, 20, 30, 40, 50])
     ax.set_yticklabels([0, 10, 20, 30, 40, 50])
 
     # Save to disk (uncomment if you prefer files)
