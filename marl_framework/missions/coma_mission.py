@@ -29,6 +29,9 @@ class COMAMission(Mission):
         self, params: Dict, writer: SummaryWriter, max_mean_episode_return: float
     ):
         super().__init__(params, writer, max_mean_episode_return)
+        
+        logger.info("🎯 Initializing COMAMission...")
+        logger.info(f"📊 TensorBoard writer log dir: {writer.log_dir}")
 
         self.grid_map = GridMap(self.params)
         self.sensor = Sensor(SensorModel(), self.grid_map)
@@ -39,6 +42,13 @@ class COMAMission(Mission):
         self.n_actions = self.params["experiment"]["constraints"]["num_actions"]
         self.budget = params["experiment"]["constraints"]["budget"]
         self.data_passes = self.params["networks"]["data_passes"]
+        
+        logger.info(f"📈 Training configuration:")
+        logger.info(f"  - Episodes: {self.num_episodes}")
+        logger.info(f"  - Batch size: {self.batch_size}")
+        logger.info(f"  - Agents: {self.n_agents}")
+        logger.info(f"  - Budget: {self.budget}")
+        
         self.coma_wrapper = COMAWrapper(self.params, self.writer)
         self.training_step_idx = 0
         self.environment_step_idx = 0
@@ -85,6 +95,9 @@ class COMAMission(Mission):
         self.last_time = self.start_time
 
     def execute(self):
+        logger.info("🚀 Starting COMA mission execution...")
+        logger.info(f"📊 Total training steps planned: {self.total_training_steps}")
+        logger.info(f"💾 TensorBoard logs will be saved to: {self.writer.log_dir}")
 
         batch_memory = BatchMemory(self.params, self.coma_wrapper)
         episode_returns = []
@@ -93,6 +106,7 @@ class COMAMission(Mission):
         chosen_actions = []
         chosen_altitudes = []
 
+        logger.info("🔄 Starting training loop...")
         for episode_idx in range(
             1,
             self.total_training_steps + 1,
@@ -153,6 +167,11 @@ class COMAMission(Mission):
                         
                         logger.info(f"Training step: {self.training_step_idx}")
                         logger.info(f"Environment step: {self.environment_step_idx}")
+                        
+                        # Log first TensorBoard write
+                        if self.training_step_idx == 1:
+                            logger.info("📊 Writing first data to TensorBoard...")
+                            
                         self.add_to_tensorboard(
                             chosen_actions,
                             chosen_altitudes,
@@ -162,6 +181,12 @@ class COMAMission(Mission):
                             critic_metrics,
                             actor_metrics,
                         )
+                        
+                        if self.training_step_idx == 1:
+                            logger.info("✅ First TensorBoard write completed")
+                            # Immediately flush first write to create files
+                            self.writer.flush()
+                            logger.info("💾 First TensorBoard flush completed")
 
                 batch_memory.clear()
                 self.episode_returns.append(episode_return)

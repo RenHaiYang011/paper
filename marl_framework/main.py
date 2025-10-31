@@ -11,6 +11,9 @@ from missions.mission_factories import MissionFactory
 from params import load_params
 
 def main():
+    # Setup logger first
+    logger = setup_logger()
+    
     constants.log_env_variables()
     params = load_params(constants.CONFIG_FILE_PATH) 
 
@@ -56,5 +59,4 @@ def main():
 
 
 if __name__ == "__main__":
-    logger = setup_logger()
     main()
