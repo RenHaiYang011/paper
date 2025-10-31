@@ -197,6 +197,10 @@ class COMAMission(Mission):
                 if self.training_step_idx % 20 == 0:
                     self.writer.flush()
                     
+                # 实时保存训练进度 (每50步保存一次)
+                if self.training_step_idx % 50 == 0:
+                    self.save_training_progress()
+                    
                 episode_returns = []
                 episode_reward_list = []
                 absolute_returns = []
@@ -264,6 +268,9 @@ class COMAMission(Mission):
         
         # Save training results to res/ folder
         self.save_training_results()
+        
+        # 标记训练完成状态
+        self.mark_training_completed()
         
         return self.max_mean_episode_return
 
@@ -746,3 +753,84 @@ class COMAMission(Mission):
         logger.info(f"Configuration snapshot saved: {config_file}")
         
         logger.info(f"All training results saved to: {res_dir}")
+
+    def save_training_progress(self):
+        """实时保存训练进度到res/文件夹"""
+        import json
+        import csv
+        from datetime import datetime
+        
+        # 确保结果目录存在
+        res_dir = constants.EXPERIMENTS_FOLDER
+        os.makedirs(res_dir, exist_ok=True)
+        
+        # 创建进度文件名 (带时间戳的实时进度文件)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # 保存当前训练进度摘要
+        progress_summary = {
+            "timestamp": timestamp,
+            "current_training_step": self.training_step_idx,
+            "total_training_steps": self.total_training_steps,
+            "progress_percentage": round((self.training_step_idx / self.total_training_steps) * 100, 2),
+            "current_max_return": float(self.max_mean_episode_return),
+            "total_episodes": len(self.episode_returns),
+            "latest_episode_returns": [float(r) for r in self.episode_returns[-10:]] if self.episode_returns else [],
+            "recent_mean_return": float(np.mean(self.episode_returns[-10:])) if len(self.episode_returns) >= 10 else 0.0,
+            "overall_mean_return": float(np.mean(self.episode_returns)) if self.episode_returns else 0.0,
+            "training_status": "in_progress"
+        }
+        
+        # 保存实时进度摘要 (固定文件名，每次覆盖)
+        progress_file = os.path.join(res_dir, "training_progress.json")
+        with open(progress_file, 'w', encoding='utf-8') as f:
+            json.dump(progress_summary, f, indent=2, ensure_ascii=False)
+        
+        # 保存完整的训练历史 (累积文件，实时更新)
+        if self.episode_returns:
+            history_file = os.path.join(res_dir, "training_history.csv")
+            
+            # 写入CSV头部和所有数据
+            with open(history_file, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                writer.writerow(['step', 'episode', 'episode_return', 'collision_return', 'utility_return', 'timestamp'])
+                
+                for i, ep_return in enumerate(self.episode_returns):
+                    collision_return = self.collision_returns[i] if i < len(self.collision_returns) else 0
+                    utility_return = self.utility_returns[i] if i < len(self.utility_returns) else 0
+                    writer.writerow([
+                        self.training_step_idx, 
+                        i+1, 
+                        ep_return, 
+                        collision_return, 
+                        utility_return,
+                        datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    ])
+        
+        logger.info(f"📊 Training progress saved: {self.training_step_idx}/{self.total_training_steps} steps ({progress_summary['progress_percentage']}%)")
+
+    def mark_training_completed(self):
+        """标记训练完成状态"""
+        import json
+        from datetime import datetime
+        
+        res_dir = constants.EXPERIMENTS_FOLDER
+        
+        # 更新进度文件为完成状态
+        progress_summary = {
+            "timestamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
+            "current_training_step": self.training_step_idx,
+            "total_training_steps": self.total_training_steps,
+            "progress_percentage": 100.0,
+            "current_max_return": float(self.max_mean_episode_return),
+            "total_episodes": len(self.episode_returns),
+            "final_mean_return": float(np.mean(self.episode_returns)) if self.episode_returns else 0.0,
+            "training_status": "completed",
+            "completion_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        
+        progress_file = os.path.join(res_dir, "training_progress.json")
+        with open(progress_file, 'w', encoding='utf-8') as f:
+            json.dump(progress_summary, f, indent=2, ensure_ascii=False)
+        
+        logger.info("✅ Training completion status saved")
