@@ -24,3 +24,4 @@ def load_params(config_file_path: str) -> Dict:
     except Exception as e:
         logger.error(f"Error while reading config file! {e}")
         raise Exception(e)
+ 

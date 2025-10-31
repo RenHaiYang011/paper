@@ -18,10 +18,10 @@ class ActorNetwork(nn.Module):
         self.n_actions = self.params["experiment"]["constraints"]["num_actions"]
 
         # Determine input channels dynamically based on configuration
-        # Base: 7 channels
+        # Base: 9 channels (increased from 7)
         # + Region search: 3 channels (region_priority, region_distance, search_completion)
         # + Frontier detection: 1 channel (frontier_map)
-        self.input_channels = 7
+        self.input_channels = 9  # Updated from 7 to include discovery_history and exploration_intensity
         
         if "search_regions" in self.params:
             self.input_channels += 3  # Add region search features

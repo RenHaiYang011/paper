@@ -24,6 +24,7 @@ def get_network_input(
     agent_state_space,
     search_region_manager: Optional[SearchRegionManager] = None,
     frontier_manager: Optional[FrontierManager] = None,
+    discovered_targets: Optional[set] = None,
 ):
     total_budget = params["experiment"]["constraints"]["budget"]
     spacing = params["experiment"]["constraints"]["spacing"]
@@ -49,7 +50,17 @@ def get_network_input(
     agent_id_map = get_agent_id_map(agent_id, position_map, params)
     footprint_map = get_footprint_map(local_information, agent_id, agent_state_space, t)
     
-    # Base observation layers (original 7 layers)
+    # Target discovery history map (new feature)
+    discovery_history_map = get_discovery_history_map(
+        discovered_targets, agent_state_space, position_map
+    )
+    
+    # Exploration intensity map (improved exploration guidance)
+    exploration_intensity_map = get_exploration_intensity_map(
+        local_information, agent_id, agent_state_space, position_map, t
+    )
+    
+    # Base observation layers (now 9 layers instead of 7)
     base_layers = [
         budget_map,
         agent_id_map,
@@ -58,6 +69,8 @@ def get_network_input(
         local_w_entropy_map,
         prob_map,
         footprint_map,
+        discovery_history_map,
+        exploration_intensity_map,
     ]
     
     # Add region search features if available (3 additional layers)
@@ -320,4 +333,118 @@ def get_frontier_feature_map(
     except Exception as e:
         logger.warning(f"Failed to get frontier feature map: {e}")
         return np.zeros_like(position_map)
+
+
+def get_discovery_history_map(
+    discovered_targets: Optional[set],
+    agent_state_space: AgentStateSpace,
+    position_map: np.array
+) -> np.array:
+    """
+    生成目标发现历史特征图
+    
+    显示已发现目标的位置，帮助智能体了解搜索进度并避免重复搜索已发现区域
+    
+    Args:
+        discovered_targets: 已发现目标位置的集合 (网格坐标)
+        agent_state_space: 智能体状态空间
+        position_map: 参考位置图
+    
+    Returns:
+        discovery_map: 发现历史图 (0-1值)
+    """
+    discovery_map = np.zeros_like(position_map)
+    
+    if discovered_targets is None or len(discovered_targets) == 0:
+        return discovery_map
+    
+    try:
+        # 在已发现目标位置标记为1
+        for target_coord in discovered_targets:
+            # target_coord 是 (row, col) 格式的网格坐标
+            row, col = target_coord
+            
+            # 确保坐标在有效范围内
+            if (0 <= row < discovery_map.shape[0] and 
+                0 <= col < discovery_map.shape[1]):
+                discovery_map[row, col] = 1.0
+                
+                # 在目标周围添加衰减的影响区域
+                influence_radius = 2  # 影响半径
+                for dr in range(-influence_radius, influence_radius + 1):
+                    for dc in range(-influence_radius, influence_radius + 1):
+                        r, c = row + dr, col + dc
+                        if (0 <= r < discovery_map.shape[0] and 
+                            0 <= c < discovery_map.shape[1]):
+                            distance = np.sqrt(dr*dr + dc*dc)
+                            if distance <= influence_radius and distance > 0:
+                                # 距离越远影响越小
+                                influence = max(0, 1.0 - distance / influence_radius) * 0.5
+                                discovery_map[r, c] = max(discovery_map[r, c], influence)
+    
+    except Exception as e:
+        logger.warning(f"Failed to generate discovery history map: {e}")
+    
+    return discovery_map
+
+
+def get_exploration_intensity_map(
+    local_information: Dict,
+    agent_id: int,
+    agent_state_space: AgentStateSpace,
+    position_map: np.array,
+    current_time: int,
+    decay_factor: float = 0.9
+) -> np.array:
+    """
+    生成探索强度特征图
+    
+    显示各区域的探索强度，结合时间衰减，鼓励探索长时间未访问的区域
+    
+    Args:
+        local_information: 本地信息字典
+        agent_id: 当前智能体ID
+        agent_state_space: 智能体状态空间
+        position_map: 参考位置图
+        current_time: 当前时间步
+        decay_factor: 时间衰减因子
+    
+    Returns:
+        intensity_map: 探索强度图 (0-1值，越高表示最近探索越频繁)
+    """
+    intensity_map = np.zeros_like(position_map)
+    
+    try:
+        # 基于所有智能体的足迹图计算探索强度
+        for agent_idx in local_information:
+            agent_info = local_information[agent_idx]
+            
+            # 获取智能体的足迹或地图信息
+            if "map2communicate" in agent_info:
+                agent_map = agent_info["map2communicate"]
+                
+                # 将足迹图调整到状态空间大小
+                agent_footprint = cv2.resize(
+                    agent_map,
+                    (agent_state_space.space_dim[1], agent_state_space.space_dim[0]),
+                    interpolation=cv2.INTER_AREA,
+                )
+                
+                # 计算探索强度 (基于覆盖度)
+                explored_mask = agent_footprint < 0.49  # 已探索区域
+                intensity_map += explored_mask.astype(float)
+        
+        # 归一化到0-1范围
+        if np.max(intensity_map) > 0:
+            intensity_map = intensity_map / np.max(intensity_map)
+        
+        # 反转强度：高强度区域（已频繁探索）-> 低值，低强度区域（少探索）-> 高值
+        # 这样网络会被引导到探索强度低的区域
+        exploration_guidance_map = 1.0 - intensity_map
+        
+        return exploration_guidance_map
+        
+    except Exception as e:
+        logger.warning(f"Failed to generate exploration intensity map: {e}")
+        return np.ones_like(position_map) * 0.5  # 返回中性值
 

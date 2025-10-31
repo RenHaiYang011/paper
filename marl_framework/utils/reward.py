@@ -47,6 +47,12 @@ def get_global_reward(
     spacing: float = 5.0,
     # Coordination parameters
     coordination_manager: CoordinationManager = None,
+    # Target discovery parameters
+    target_discovery_reward: float = 50.0,
+    mission_success_reward: float = 100.0,
+    mission_failure_penalty: float = -50.0,
+    discovered_targets: set = None,
+    total_targets: int = None,
 ):
     done = False
     reward = 0
@@ -198,6 +204,59 @@ def get_global_reward(
         # Don't fail reward computation if frontier reward fails
         frontier_reward = 0.0
 
+    # ==================== Target Discovery Rewards ====================
+    discovery_rewards = {
+        'new_discovery': 0.0,
+        'mission_completion': 0.0,
+        'mission_failure': 0.0,
+        'total_discovery_reward': 0.0
+    }
+    
+    try:
+        if discovered_targets is not None and total_targets is not None:
+            # Check for new target discoveries in this step
+            new_discoveries = detect_new_target_discoveries(
+                last_map, next_map, simulated_map, agent_state_space, discovered_targets
+            )
+            
+            # Reward for new discoveries
+            if new_discoveries > 0:
+                discovery_rewards['new_discovery'] = float(target_discovery_reward) * new_discoveries
+                absolute_reward += discovery_rewards['new_discovery']
+                
+                # Calculate collaborative discovery rewards for other agents
+                if next_positions is not None and len(next_positions) > 1:
+                    current_position = next_positions[agent_id] if len(next_positions) > agent_id else None
+                    if current_position is not None:
+                        collab_rewards = calculate_collaborative_discovery_reward(
+                            agent_id, next_positions, current_position
+                        )
+                        # Add collaborative reward for this agent (usually 0 for the discoverer)
+                        collaborative_bonus = collab_rewards.get(agent_id, 0.0)
+                        absolute_reward += collaborative_bonus
+            
+            # Check mission completion/failure
+            if len(discovered_targets) >= total_targets:
+                # Mission success: found all targets
+                discovery_rewards['mission_completion'] = float(mission_success_reward)
+                absolute_reward += discovery_rewards['mission_completion']
+                done = True
+            elif t >= budget - 1:
+                # Mission failure: budget exhausted without finding all targets
+                discovery_rewards['mission_failure'] = float(mission_failure_penalty)
+                absolute_reward += discovery_rewards['mission_failure']
+                done = True
+            
+            # Total discovery reward
+            discovery_rewards['total_discovery_reward'] = sum([
+                discovery_rewards['new_discovery'],
+                discovery_rewards['mission_completion'], 
+                discovery_rewards['mission_failure']
+            ])
+    except Exception as e:
+        # Don't fail reward computation if target discovery fails
+        pass
+
     # ==================== Coordination Rewards ====================
     coordination_rewards = {
         'overlap_penalty': 0.0,
@@ -265,6 +324,18 @@ def get_global_reward(
             writer.add_scalar('Coordination/Division_Reward', coordination_rewards['division_reward'], global_step)
             writer.add_scalar('Coordination/Collaboration_Reward', coordination_rewards['collaboration_reward'], global_step)
             writer.add_scalar('Coordination/Total_Coordination_Reward', coordination_rewards['total_coordination'], global_step)
+            
+            # Target discovery rewards
+            writer.add_scalar('Discovery/New_Discovery_Reward', discovery_rewards['new_discovery'], global_step)
+            writer.add_scalar('Discovery/Mission_Completion_Reward', discovery_rewards['mission_completion'], global_step)
+            writer.add_scalar('Discovery/Mission_Failure_Penalty', discovery_rewards['mission_failure'], global_step)
+            writer.add_scalar('Discovery/Total_Discovery_Reward', discovery_rewards['total_discovery_reward'], global_step)
+            
+            # Mission progress tracking
+            if discovered_targets is not None and total_targets is not None:
+                discovery_rate = len(discovered_targets) / max(total_targets, 1)
+                writer.add_scalar('Mission/Discovery_Rate', discovery_rate * 100, global_step)
+                writer.add_scalar('Mission/Remaining_Targets', max(total_targets - len(discovered_targets), 0), global_step)
     except Exception:
         # do not raise from logging
         pass
@@ -426,3 +497,108 @@ def compute_overlap(footprint1, footprint2, simulated_map):
     if xl > xr:
         return 0
     return ((yd - yu + 1) * (xr - xl + 1)) / np.size(simulated_map)
+
+
+def detect_new_target_discoveries(
+    last_map: np.array,
+    next_map: np.array, 
+    simulated_map: np.array,
+    agent_state_space: AgentStateSpace,
+    discovered_targets: set,
+    discovery_threshold: float = 0.8
+) -> int:
+    """
+    检测新发现的目标数量
+    
+    Args:
+        last_map: 上一步的地图状态
+        next_map: 当前步的地图状态
+        simulated_map: 真实地图(ground truth)
+        agent_state_space: 智能体状态空间
+        discovered_targets: 已发现目标的集合
+        discovery_threshold: 目标发现的置信度阈值
+    
+    Returns:
+        new_discoveries: 新发现的目标数量
+    """
+    try:
+        new_discoveries = 0
+        
+        # 找到真实地图中的目标位置
+        target_positions = np.where(simulated_map > discovery_threshold)
+        
+        if len(target_positions[0]) == 0:
+            return 0
+        
+        # 检查每个目标位置
+        for i in range(len(target_positions[0])):
+            target_coord = (target_positions[0][i], target_positions[1][i])
+            
+            # 如果这个目标还未被发现
+            if target_coord not in discovered_targets:
+                # 检查在当前步是否被发现
+                last_confidence = last_map[target_coord] if last_map is not None else 0.0
+                current_confidence = next_map[target_coord]
+                
+                # 如果置信度超过阈值,且比上一步有显著提升,认为是新发现
+                if (current_confidence > discovery_threshold and 
+                    current_confidence - last_confidence > 0.3):
+                    discovered_targets.add(target_coord)
+                    new_discoveries += 1
+        
+        return new_discoveries
+        
+    except Exception as e:
+        # 如果检测失败,返回0,不影响其他奖励计算
+        return 0
+
+
+def calculate_collaborative_discovery_reward(
+    discovering_agent_id: int,
+    all_agent_positions: list,
+    discovery_position: np.array,
+    collaboration_distance: float = 20.0,
+    reward_decay: float = 0.5
+) -> dict:
+    """
+    计算协同发现奖励
+    
+    当一个智能体发现目标时,奖励附近协助的其他智能体
+    
+    Args:
+        discovering_agent_id: 发现目标的智能体ID
+        all_agent_positions: 所有智能体的位置列表
+        discovery_position: 发现目标的位置
+        collaboration_distance: 协同距离阈值
+        reward_decay: 奖励衰减系数
+    
+    Returns:
+        collaborative_rewards: 每个智能体的协同奖励字典
+    """
+    collaborative_rewards = {}
+    
+    try:
+        for agent_id, position in enumerate(all_agent_positions):
+            if agent_id == discovering_agent_id:
+                # 发现者获得全额奖励(在主函数中已给予)
+                collaborative_rewards[agent_id] = 0.0
+                continue
+            
+            # 计算距离
+            distance = np.linalg.norm(np.array(position[:2]) - np.array(discovery_position[:2]))
+            
+            # 如果在协同距离内,给予衰减奖励
+            if distance <= collaboration_distance:
+                # 距离越近,奖励越高
+                proximity_factor = 1.0 - (distance / collaboration_distance)
+                collaborative_reward = reward_decay * proximity_factor
+                collaborative_rewards[agent_id] = collaborative_reward
+            else:
+                collaborative_rewards[agent_id] = 0.0
+                
+    except Exception as e:
+        # 失败时返回空奖励
+        for agent_id in range(len(all_agent_positions)):
+            collaborative_rewards[agent_id] = 0.0
+    
+    return collaborative_rewards
