@@ -44,16 +44,52 @@ CHECKPOINTS_DIR = os.path.join(REPO_DIR, CHECKPOINTS_DIR)
 TRAIN_DATA_DIR = load_from_env("TRAIN_DATA_DIR", str, "generated_train_data")
 TRAIN_DATA_DIR = os.path.join(REPO_DIR, TRAIN_DATA_DIR)
 
-# 修改：将结果和日志存储到marl_framework文件夹下
-EXPERIMENTS_FOLDER = load_from_env("EXPERIMENT_FILE_PATH", str, "res")
-EXPERIMENTS_FOLDER = os.path.join(REPO_DIR, EXPERIMENTS_FOLDER)
-
-LOG_DIR = load_from_env("LOG_DIR", str, "log")
-LOG_DIR = os.path.join(REPO_DIR, LOG_DIR)
+# 路径将在load_params后动态设置
+EXPERIMENTS_FOLDER = None
+LOG_DIR = None
 LOG_LEVEL = logging.DEBUG
 
 DATASETS_DIR = load_from_env("DATASETS_DIR", str, "datasets")
 DATASETS_DIR = os.path.join(REPO_DIR, DATASETS_DIR)
+
+
+def setup_paths(params):
+    """
+    根据配置参数设置日志和结果存储路径
+    
+    Args:
+        params: 配置参数字典
+    """
+    global LOG_DIR, EXPERIMENTS_FOLDER
+    
+    # 获取路径配置，如果没有则使用默认值
+    paths_config = params.get("paths", {})
+    log_dir_config = paths_config.get("log_dir", "log")
+    results_dir_config = paths_config.get("results_dir", "res")
+    
+    # 处理日志路径
+    if os.path.isabs(log_dir_config):
+        # 绝对路径
+        LOG_DIR = log_dir_config
+    else:
+        # 相对路径，相对于marl_framework目录
+        LOG_DIR = os.path.join(REPO_DIR, log_dir_config)
+    
+    # 处理结果路径
+    if os.path.isabs(results_dir_config):
+        # 绝对路径
+        EXPERIMENTS_FOLDER = results_dir_config
+    else:
+        # 相对路径，相对于marl_framework目录
+        EXPERIMENTS_FOLDER = os.path.join(REPO_DIR, results_dir_config)
+    
+    # 确保目录存在
+    os.makedirs(LOG_DIR, exist_ok=True)
+    os.makedirs(EXPERIMENTS_FOLDER, exist_ok=True)
+    
+    logger.info(f"📁 Paths configured:")
+    logger.info(f"  - Log directory: {LOG_DIR}")
+    logger.info(f"  - Results directory: {EXPERIMENTS_FOLDER}")
 
 
 class SensorType:

@@ -15,6 +15,18 @@
 # - 预计时间: 8-12小时
 # - 模型性能: ~80-85%
 
+# ==================== 路径配置 ====================
+paths:
+  # 日志存储路径 (可以是绝对路径或相对于marl_framework的路径)
+  log_dir: "log"                    # 默认: marl_framework/log
+  # 结果存储路径 (可以是绝对路径或相对于marl_framework的路径)  
+  results_dir: "res"                # 默认: marl_framework/res
+  
+  # 示例其他配置:
+  # log_dir: "E:/my_logs"           # 绝对路径
+  # results_dir: "../paper_results" # 相对于marl_framework的上级目录
+  # log_dir: "/tmp/marl_logs"       # Linux绝对路径
+
 environment:
   num_envs: 2
   seed: 3

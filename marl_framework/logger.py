@@ -6,7 +6,9 @@ import constants
 
 
 def setup_logger() -> logging.Logger:
-    os.makedirs(constants.LOG_DIR, exist_ok=True)
+    # 如果LOG_DIR还没有设置，使用默认路径
+    log_dir = constants.LOG_DIR if constants.LOG_DIR is not None else os.path.join(constants.REPO_DIR, "log")
+    os.makedirs(log_dir, exist_ok=True)
     
     # Configure the root marl_framework logger
     logger = logging.getLogger("marl_framework")
@@ -27,7 +29,7 @@ def setup_logger() -> logging.Logger:
     # File handler
     timestamp = time.strftime("%Y%m%d%H%M%S")
     log_filename = f"log_{timestamp}.log"
-    log_file_path = os.path.join(constants.LOG_DIR, log_filename)
+    log_file_path = os.path.join(log_dir, log_filename)
 
     file_handler = logging.FileHandler(
         filename=log_file_path, mode="w", encoding="utf-8"

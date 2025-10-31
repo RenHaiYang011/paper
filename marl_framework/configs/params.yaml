@@ -1,3 +1,10 @@
+# ==================== 路径配置 ====================
+paths:
+  # 日志存储路径 (可以是绝对路径或相对于marl_framework的路径)
+  log_dir: "log"                    # 默认: marl_framework/log
+  # 结果存储路径 (可以是绝对路径或相对于marl_framework的路径)  
+  results_dir: "res"                # 默认: marl_framework/res
+
 environment:  # 地图空间大小
   num_envs: 2
   seed: 3  # not 0, would mean same start position for every uav

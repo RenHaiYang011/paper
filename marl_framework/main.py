@@ -11,19 +11,21 @@ from missions.mission_factories import MissionFactory
 from params import load_params
 
 def main():
-    # Setup logger first
+    # Setup logger first (with basic configuration)
     logger = setup_logger()
     
-    # Create necessary directories in project root
-    os.makedirs(constants.LOG_DIR, exist_ok=True)
-    os.makedirs(constants.EXPERIMENTS_FOLDER, exist_ok=True)
-    
-    logger.info(f"📁 Created directories:")
-    logger.info(f"  - Log directory: {constants.LOG_DIR}")
-    logger.info(f"  - Results directory: {constants.EXPERIMENTS_FOLDER}")
-    
     constants.log_env_variables()
-    params = load_params(constants.CONFIG_FILE_PATH) 
+    params = load_params(constants.CONFIG_FILE_PATH)
+    
+    # Setup paths based on configuration
+    constants.setup_paths(params)
+    
+    # Re-setup logger with correct paths
+    logger = setup_logger()
+    
+    logger.info(f"📁 Directories configured:")
+    logger.info(f"  - Log directory: {constants.LOG_DIR}")
+    logger.info(f"  - Results directory: {constants.EXPERIMENTS_FOLDER}") 
 
     # Set device
     if torch.cuda.is_available() and params["networks"]["device"] == "cuda":
