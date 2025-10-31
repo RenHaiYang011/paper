@@ -14,6 +14,14 @@ def main():
     # Setup logger first
     logger = setup_logger()
     
+    # Create necessary directories in project root
+    os.makedirs(constants.LOG_DIR, exist_ok=True)
+    os.makedirs(constants.EXPERIMENTS_FOLDER, exist_ok=True)
+    
+    logger.info(f"📁 Created directories:")
+    logger.info(f"  - Log directory: {constants.LOG_DIR}")
+    logger.info(f"  - Results directory: {constants.EXPERIMENTS_FOLDER}")
+    
     constants.log_env_variables()
     params = load_params(constants.CONFIG_FILE_PATH) 
 

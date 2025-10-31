@@ -2,7 +2,8 @@ import logging
 import os
 import torch
 
-logger = logging.getLogger(__name__)
+# Use the same logger name as setup_logger
+logger = logging.getLogger("marl_framework")
 
 DEVICE = torch.device("cpu")
 
@@ -31,9 +32,8 @@ PLOT_LEGEND_FONT_SIZE = 20
 PLOT_TICKS_SIZE = 20
 PLOT_LINE_WIDTH = 5
 
-REPO_DIR = os.path.dirname(os.path.abspath(__file__)) + os.sep
-# REPO_DIR = "/home/julius/Dokumente/Uni/Bonn/multi_agent_rl/marl_framework/"
-# REPO_DIR = "/home/masha/jonas/multi_agent_rl/marl_framework/"
+# 获取marl_framework文件夹路径作为基准
+REPO_DIR = os.path.dirname(os.path.abspath(__file__)) + os.sep  # marl_framework文件夹
 
 CONFIG_FILE_PATH = load_from_env("CONFIG_FILE_PATH", str, "configs/params.yaml")
 CONFIG_FILE_PATH = os.path.join(REPO_DIR, CONFIG_FILE_PATH)
@@ -44,7 +44,8 @@ CHECKPOINTS_DIR = os.path.join(REPO_DIR, CHECKPOINTS_DIR)
 TRAIN_DATA_DIR = load_from_env("TRAIN_DATA_DIR", str, "generated_train_data")
 TRAIN_DATA_DIR = os.path.join(REPO_DIR, TRAIN_DATA_DIR)
 
-EXPERIMENTS_FOLDER = load_from_env("EXPERIMENT_FILE_PATH", str, "results")
+# 修改：将结果和日志存储到marl_framework文件夹下
+EXPERIMENTS_FOLDER = load_from_env("EXPERIMENT_FILE_PATH", str, "res")
 EXPERIMENTS_FOLDER = os.path.join(REPO_DIR, EXPERIMENTS_FOLDER)
 
 LOG_DIR = load_from_env("LOG_DIR", str, "log")

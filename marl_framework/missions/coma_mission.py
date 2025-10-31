@@ -693,7 +693,7 @@ class COMAMission(Mission):
         from datetime import datetime
         
         # Create res directory if it doesn't exist
-        res_dir = os.path.join(constants.REPO_DIR, "res")
+        res_dir = constants.EXPERIMENTS_FOLDER
         os.makedirs(res_dir, exist_ok=True)
         
         # Create timestamp for unique filenames
