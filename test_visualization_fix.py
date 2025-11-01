@@ -84,9 +84,9 @@ def test_visualization_fix():
     
     # 创建简单的障碍物数据 - 使用正确的格式，确保在实际覆盖范围内
     obstacles = [
-        {"x": 15, "y": 15, "z": 0, "height": 8},   # 在 high_priority_zone 内
-        {"x": 35, "y": 15, "z": 0, "height": 12},  # 在 medium_priority_zone 内  
-        {"x": 25, "y": 35, "z": 0, "height": 6}    # 在 low_priority_zone 内
+        {"x": 12, "y": 10, "z": 0, "height": 8},   # 在 high_priority_zone 内
+        {"x": 26, "y": 5, "z": 0, "height": 12},  # 在 medium_priority_zone 内  
+        {"x": 28, "y": 31, "z": 0, "height": 6}    # 在 low_priority_zone 内
     ]
     
     print(f"障碍物数据:")

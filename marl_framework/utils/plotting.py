@@ -107,20 +107,33 @@ def plot_pyramid(ax, x, y, z, height=10, base_size=3.0, color='gray', alpha=0.7)
     else:
         edge_color = 'black'
     
-    # 创建3D多边形集合，设置合适的zorder确保显示在地图上方
+    # 创建3D多边形集合，增强边缘线宽度让立体感更强
     pyramid = Poly3DCollection(faces, alpha=alpha, facecolor=color,
-                              edgecolor=edge_color, linewidths=1.5)
-    pyramid.set_zsort('average')  # 使用average排序，确保3D效果
+                              edgecolor=edge_color, linewidths=3.0)
+    pyramid.set_zsort('min')  # 使用min排序，让障碍物显示清晰
     ax.add_collection3d(pyramid)
     
-    # 为了增强3D效果，在障碍物底部添加一个稍微暗一点的圆形阴影
-    circle_theta = np.linspace(0, 2*np.pi, 20)
-    shadow_x = x + (base_size/2) * np.cos(circle_theta)
-    shadow_y = y + (base_size/2) * np.sin(circle_theta)
-    shadow_z = np.full_like(shadow_x, z + 0.1)  # 稍微高于地面
+    # 在障碍物底部周围添加一个灰色基座，增强"立在地面"的视觉效果
+    # 基座比障碍物底面稍大一圈，颜色稍暗，增强3D立体感
+    base_r = base_size / 2 * 1.15  # 基座比障碍物底面大15%
+    base_z = max(0, z - 0.1)  # 基座稍微低一点，但不能低于0
+    base_vertices = np.array([
+        [x-base_r, y-base_r, base_z],
+        [x+base_r, y-base_r, base_z],
+        [x+base_r, y+base_r, base_z],
+        [x-base_r, y+base_r, base_z]
+    ])
+    base_face = [base_vertices]
+    base_patch = Poly3DCollection(base_face, alpha=0.4, facecolor='gray',
+                                 edgecolor='darkgray', linewidths=1.5)
+    base_patch.set_zsort('max')
+    ax.add_collection3d(base_patch)
     
-    # 添加阴影效果
-    ax.plot(shadow_x, shadow_y, shadow_z, color='gray', alpha=0.3, linewidth=2)
+    # 在障碍物四个角画从基座到底面的垂直支撑线，增强立体感
+    r = base_size / 2
+    for corner_x, corner_y in [[x-r, y-r], [x+r, y-r], [x+r, y+r], [x-r, y+r]]:
+        ax.plot([corner_x, corner_x], [corner_y, corner_y], [base_z, z], 
+               color=edge_color, alpha=0.5, linewidth=2.0, linestyle='-')
 
 
 # ==================== Main Plotting Functions ====================
@@ -137,32 +150,7 @@ def plot_trajectories(
     obstacles=None,
 ):
 
-    # colors = ["b", "g", "c", "r", "k", "w", "m", "y"]
-    # plt.figure()
-    #
-    # simulated_map = cv2.resize(
-    #     simulated_map,
-    #     (51, 51),
-    #     interpolation=cv2.INTER_AREA,
-    # )
-    # plt.imshow(simulated_map)
-    # plt.colorbar()
-    #
-    # for agent_id in range(n_agents):
-    #     x = []
-    #     y = []
-    #     z = []
-    #     for positions in agent_positions:
-    #         x.append(positions[agent_id][0])
-    #         y.append(positions[agent_id][1])
-    #         z.append(positions[agent_id][2])
-    #
-    #     plt.plot(y, x, color=colors[agent_id], linestyle="-", linewidth=10)
-    #     plt.plot(y[0], x[0], color=colors[agent_id], marker="o", markersize=14)
-    #
-    # save example plot to project log directory
-    # plt.savefig(os.path.join(LOG_PLOTS_DIR, f"coma_pathes_3d_{training_step_index}.png"))
-    # writer.add_figure(f"Agent trajectories", plt.gcf(), training_step_index, close=True)
+
 
     fig = plt.figure(figsize=(12, 10))
     ax = fig.add_subplot(111, projection="3d")
@@ -221,17 +209,29 @@ def plot_trajectories(
     
     # Plot obstacles AFTER map to ensure proper layering
     # 障碍物绘制在地图之后，确保显示在上层
+    # CRITICAL: 障碍物的 x,y 坐标必须与地图坐标系统一致
     if obstacles is not None and len(obstacles) > 0:
         print(f"PLOT DEBUG: 绘制 {len(obstacles)} 个障碍物")
+        print(f"PLOT DEBUG: 地图坐标范围: X[0, {actual_x_coverage:.2f}], Y[0, {actual_y_coverage:.2f}]")
+        
         for i, obs in enumerate(obstacles):
+            # 障碍物坐标是世界坐标（米），直接使用
             obs_x, obs_y, obs_z = obs['x'], obs['y'], obs['z']
             obs_height = obs.get('height', 10)
-            print(f"PLOT DEBUG: 障碍物 {i+1}: ({obs_x}, {obs_y}, {obs_z}) 高度: {obs_height}")
             
-            # 障碍物从 z=0.5 开始向上延伸（稍微悬浮避免与地图 z=0 重叠）
-            obstacle_base_z = 0.5
-            plot_pyramid(ax, obs_x, obs_y, obstacle_base_z, height=obs_height, 
-                        base_size=4.0, color='yellow', alpha=0.95, zorder=100)
+            # 验证障碍物是否在地图范围内
+            if 0 <= obs_x <= actual_x_coverage and 0 <= obs_y <= actual_y_coverage:
+                print(f"PLOT DEBUG: 障碍物 {i+1}: 世界坐标({obs_x:.1f}, {obs_y:.1f}, {obs_z:.1f}) 高度: {obs_height}m ✓ 在地图范围内")
+                
+                # 障碍物从 z=0.5 开始向上延伸（稍微悬浮避免与地图 z=0 重叠）
+                obstacle_base_z = 0.5
+                
+                # 直接使用世界坐标绘制，与地图坐标系统一致
+                # 增大 base_size 让障碍物更明显醒目
+                plot_pyramid(ax, obs_x, obs_y, obstacle_base_z, height=obs_height, 
+                            base_size=5.5, color='yellow', alpha=0.9)
+            else:
+                print(f"PLOT DEBUG: 障碍物 {i+1}: 坐标({obs_x}, {obs_y}) ✗ 超出地图范围!")
     else:
         print(f"PLOT DEBUG: 没有障碍物数据")
     
