@@ -171,13 +171,15 @@ def plot_trajectories(
     X, Y = np.meshgrid(x_coords, y_coords)     # X: columns, Y: rows
     
     # Plot ground surface with proper coordinate alignment - 去掉透明度，清晰显示目标/非目标区域
+    # 确保地图在 z=0 平面，作为底层
     surface = ax.plot_surface(
         X,  # X coordinates (columns, 0-50)
         Y,  # Y coordinates (rows, 0-50)
-        np.zeros_like(simulated_map),
+        np.zeros_like(simulated_map),  # 确保地图在 z=0
         facecolors=cm.coolwarm(simulated_map),
-        zorder=1,
+        zorder=1,  # 底层
         alpha=1.0,  # 完全不透明，清晰显示红蓝色区域对比
+        shade=False,  # 减少阴影效果，让颜色更清晰
     )
     
     # 注释掉目标立方体绘制 - 根据用户要求删除绿色立方体
@@ -211,14 +213,15 @@ def plot_trajectories(
     #             plot_cube(ax, tx, ty, 3.0, size=2.5, color='lime', alpha=0.95)  # 提高到3米高度，增大尺寸
     #             targets_plotted.add((tx, ty))
     
-    # Plot obstacles (if provided) - 保留黄色障碍物金字塔
+    # Plot obstacles (if provided) - 保留黄色障碍物金字塔，调整参数使其更明显地站在地图上
     if obstacles is not None and len(obstacles) > 0:
         for obs in obstacles:
             obs_x, obs_y, obs_z = obs['x'], obs['y'], obs['z']
             obs_height = obs.get('height', 10)
             # Draw pyramid/cone for obstacle in yellow for visibility
+            # 增加不透明度和基座大小，使障碍物更显眼，更"贴地"
             plot_pyramid(ax, obs_x, obs_y, obs_z, height=obs_height, 
-                        base_size=3.0, color='yellow', alpha=0.85)
+                        base_size=4.0, color='yellow', alpha=0.95)
     
     # Plot agent trajectories
     for agent_id in range(n_agents):
@@ -240,8 +243,8 @@ def plot_trajectories(
             ax.scatter(x[0], y[0], z[0], color=colors[agent_id], 
                       s=100, marker='o', zorder=101, edgecolors='black', linewidths=2)
     
-    # Set viewing angle
-    ax.view_init(elev=35, azim=45)
+    # Set viewing angle - 调整视角让障碍物看起来真正在地图上
+    ax.view_init(elev=25, azim=60)  # 降低仰角，调整方位角，更好的3D效果
 
     # Use dynamic limits based on world coordinate system (0-50)
     ax.set_xlim(0, 50)
@@ -252,9 +255,9 @@ def plot_trajectories(
     if all_altitudes:
         min_alt = min(all_altitudes)
         max_alt = max(all_altitudes)
-        # Add some padding
-        z_min = max(0, min_alt - 5)
-        z_max = max_alt + 5
+        # Add some padding, but ensure obstacle heights are visible
+        z_min = 0  # 固定从地面开始
+        z_max = max(max_alt + 5, 20)  # 确保障碍物可见
         ax.set_zlim(z_min, z_max)
         # Set z ticks dynamically
         z_step = max(5, int((z_max - z_min) / 4))
@@ -262,8 +265,8 @@ def plot_trajectories(
         if z_ticks:
             ax.set_zticks(z_ticks)
     else:
-        ax.set_zlim(0, 30)  # fallback
-        ax.set_zticks([0, 10, 20, 30])
+        ax.set_zlim(0, 25)  # 稍微提高上限以显示障碍物
+        ax.set_zticks([0, 5, 10, 15, 20, 25])
     
     # Set x/y ticks to match world coordinates (0-50)
     ax.set_xticks([0, 10, 20, 30, 40, 50])
