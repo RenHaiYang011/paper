@@ -5,7 +5,8 @@ import cv2
 import os
 import logging
 from typing import Optional, List, Dict
-
+# Plot each face
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
@@ -50,10 +51,18 @@ def plot_cube(ax, x, y, z, size=1.0, color='red', alpha=0.8):
         [vertices[4], vertices[5], vertices[6], vertices[7]]   # top
     ]
     
-    # Plot each face
-    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+  
+    
+    # Use contrasting edge color based on face color
+    if color == 'lime' or color == 'green':
+        edge_color = 'darkgreen'
+    elif color == 'yellow':
+        edge_color = 'darkorange'
+    else:
+        edge_color = 'black'
+    
     cube = Poly3DCollection(faces, alpha=alpha, facecolor=color, 
-                           edgecolor='darkred', linewidths=1.5)
+                           edgecolor=edge_color, linewidths=2.0)
     ax.add_collection3d(cube)
 
 
@@ -90,8 +99,15 @@ def plot_pyramid(ax, x, y, z, height=10, base_size=3.0, color='gray', alpha=0.7)
     
     # Plot each face
     from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+    
+    # Use contrasting edge color for visibility
+    if color == 'yellow':
+        edge_color = 'darkorange'
+    else:
+        edge_color = 'black'
+    
     pyramid = Poly3DCollection(faces, alpha=alpha, facecolor=color,
-                              edgecolor='black', linewidths=1.5)
+                              edgecolor=edge_color, linewidths=2.0)
     ax.add_collection3d(pyramid)
 
 
@@ -188,8 +204,8 @@ def plot_trajectories(
             
             if not too_close:
                 # Draw cube for target at ground level (z=0)
-                # Cube will be drawn from z=0 to z=size
-                plot_cube(ax, tx, ty, 1.0, size=2.0, color='red', alpha=0.9)
+                # Use bright green for high contrast against red map areas
+                plot_cube(ax, tx, ty, 1.0, size=2.0, color='lime', alpha=0.95)
                 targets_plotted.add((tx, ty))
     
     # Plot obstacles (if provided)
@@ -197,9 +213,9 @@ def plot_trajectories(
         for obs in obstacles:
             obs_x, obs_y, obs_z = obs['x'], obs['y'], obs['z']
             obs_height = obs.get('height', 10)
-            # Draw pyramid/cone for obstacle
+            # Draw pyramid/cone for obstacle in yellow for visibility
             plot_pyramid(ax, obs_x, obs_y, obs_z, height=obs_height, 
-                        base_size=3.0, color='gray', alpha=0.7)
+                        base_size=3.0, color='yellow', alpha=0.85)
     
     # Plot agent trajectories
     for agent_id in range(n_agents):
@@ -267,8 +283,8 @@ def plot_trajectories(
     # Add custom legend for targets and obstacles
     from matplotlib.patches import Patch
     legend_elements = [
-        Patch(facecolor='red', edgecolor='darkred', label='Target (Cube)', alpha=0.8),
-        Patch(facecolor='gray', edgecolor='black', label='Obstacle (Pyramid)', alpha=0.7),
+        Patch(facecolor='lime', edgecolor='darkgreen', label='Target (Green Cube)', alpha=0.95),
+        Patch(facecolor='yellow', edgecolor='darkorange', label='Obstacle (Yellow Pyramid)', alpha=0.85),
     ]
     ax.legend(handles=legend_elements, loc='upper right', fontsize=8, framealpha=0.9)
 

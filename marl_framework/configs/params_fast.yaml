@@ -49,6 +49,13 @@ sensor:
   simulation:
     type: "random_field"
     cluster_radius: 5
+    # 地图生成方式:
+    # - 用 region_based 展示"有先验信息时的高效搜索"
+    # - 用 random_field 展示"无先验信息时的鲁棒搜索"
+    # - 对比分析：先验信息的价值
+    # - "random_field": 使用原始随机场生成（独立于 search_regions）
+    # - "region_based": 根据 search_regions 配置生成目标分布
+    map_type: "region_based"  # 改为 "random_field" 可切换回随机模式
 
 mapping:
   prior: 0.5

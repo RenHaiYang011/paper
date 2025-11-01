@@ -5,6 +5,7 @@ import numpy as np
 import torch
 
 from mapping import ground_truths
+from mapping import ground_truths_region_based
 from mapping.grid_maps import GridMap
 
 from marl_framework.sensors import Sensor
@@ -32,12 +33,31 @@ class Simulation:
         self.sensor_model = sensor_model
 
     def simulate_map(self, episode: int):
-        return ground_truths.gaussian_random_field(
-            lambda k: k ** (-self.cluster_radius),
-            self.y_dim_pixel,
-            self.x_dim_pixel,
-            episode,
-        )
+        """
+        生成 simulated_map (地面真值)
+        
+        可以通过配置选择生成方式：
+        - "region_based": 根据 search_regions 配置生成目标分布
+        - "random_field": 使用原始的随机场生成（默认）
+        """
+        map_type = self.params.get("sensor", {}).get("simulation", {}).get("map_type", "random_field")
+        
+        if map_type == "region_based":
+            logger.info(f"Generating region-based target map for episode {episode}")
+            return ground_truths_region_based.generate_region_based_map(
+                self.params,
+                self.y_dim_pixel,
+                self.x_dim_pixel,
+                episode,
+            )
+        else:
+            # 默认使用原始随机场生成
+            return ground_truths.gaussian_random_field(
+                lambda k: k ** (-self.cluster_radius),
+                self.y_dim_pixel,
+                self.x_dim_pixel,
+                episode,
+            )
 
     def get_measurement(self, altitude, footprint, mode):
         map_section = self.simulated_map[
