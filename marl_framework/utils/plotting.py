@@ -206,12 +206,13 @@ def plot_trajectories(
     y_coords = np.linspace(0, actual_y_coverage, map_height)  # rows -> Y
     X, Y = np.meshgrid(x_coords, y_coords)                    # X: columns, Y: rows
     
-    # Plot ground surface with proper coordinate alignment - 确保地图在底层
-    # 地图在 z=0 平面，作为基础底面
+    # Plot ground surface with proper coordinate alignment - 地图在 z=0（地面）
+    # 障碍物将从 z=0.5 开始，稍微悬浮避免 z-fighting
+    map_z_level = 0  # 地图在 z=0 平面（地面）
     surface = ax.plot_surface(
         X,  # X coordinates (columns, 0-50)
         Y,  # Y coordinates (rows, 0-50)
-        np.zeros_like(simulated_map),  # 地图在z=0平面
+        np.full_like(simulated_map, map_z_level),  # 地图在 z=0 平面
         facecolors=cm.coolwarm(simulated_map),
         zorder=1,  # 地图在底层
         alpha=1.0,  # 完全不透明，清晰显示红蓝色区域对比
@@ -227,14 +228,10 @@ def plot_trajectories(
             obs_height = obs.get('height', 10)
             print(f"PLOT DEBUG: 障碍物 {i+1}: ({obs_x}, {obs_y}, {obs_z}) 高度: {obs_height}")
             
-            # 障碍物从地面(z=0)开始向上延伸，创建真正的3D立体效果
-            plot_pyramid(ax, obs_x, obs_y, 0, height=obs_height, 
-                        base_size=4.0, color='yellow', alpha=0.9)
-            
-            # 在障碍物顶部添加红色标记确保可见性
-            ax.scatter([obs_x], [obs_y], [obs_height + 2], 
-                      color='red', s=150, marker='X', zorder=150, 
-                      edgecolors='darkred', linewidths=2)
+            # 障碍物从 z=0.5 开始向上延伸（稍微悬浮避免与地图 z=0 重叠）
+            obstacle_base_z = 0.5
+            plot_pyramid(ax, obs_x, obs_y, obstacle_base_z, height=obs_height, 
+                        base_size=4.0, color='yellow', alpha=0.95, zorder=100)
     else:
         print(f"PLOT DEBUG: 没有障碍物数据")
     
@@ -274,11 +271,14 @@ def plot_trajectories(
         all_altitudes.extend(obstacle_heights)
         print(f"PLOT DEBUG: 障碍物最高点: {max(obstacle_heights):.1f}米")
     
+    # 定义地图所在的z平面
+    map_z_level = 0  # 地图在 z=0
+    
     if all_altitudes:
         min_alt = min(all_altitudes)
         max_alt = max(all_altitudes)
-        # Add padding to ensure all obstacles are visible
-        z_min = 0  # 从地面开始，不要负值
+        # Z轴范围：从地图平面 z=0 开始
+        z_min = 0  # 从地面开始
         z_max = max(max_alt + 8, 25)  # 确保最高障碍物+padding都可见
         ax.set_zlim(z_min, z_max)
         print(f"PLOT DEBUG: Z轴范围: [{z_min}, {z_max}]")
@@ -288,7 +288,7 @@ def plot_trajectories(
         if z_ticks:
             ax.set_zticks(z_ticks)
     else:
-        ax.set_zlim(0, 30)  # 从0开始，不要负值
+        ax.set_zlim(map_z_level, 30)  # 从地图平面开始
         ax.set_zticks([0, 5, 10, 15, 20, 25, 30])
     
     # Set x/y ticks to match actual world coordinates
