@@ -145,15 +145,17 @@ def plot_trajectories(
     map_height, map_width = simulated_map.shape
     
     # Create coordinate meshgrid in world coordinates (0-50 range)
-    # Scale the meshgrid to match the actual world coordinate system
-    world_x = np.linspace(0, 50, map_width)
-    world_y = np.linspace(0, 50, map_height)
-    Y, X = np.meshgrid(world_x, world_y)
+    # CRITICAL: meshgrid must match plot_surface X,Y ordering
+    # simulated_map is indexed as [row, col] = [y, x]
+    # For plot_surface(X, Y, Z): X varies along columns, Y varies along rows
+    x_coords = np.linspace(0, 50, map_width)   # columns -> X
+    y_coords = np.linspace(0, 50, map_height)  # rows -> Y
+    X, Y = np.meshgrid(x_coords, y_coords)     # X: columns, Y: rows
     
     # Plot ground surface with proper coordinate alignment
     ax.plot_surface(
-        X,  # Swapped X and Y for correct alignment
-        Y,
+        X,  # X coordinates (columns, 0-50)
+        Y,  # Y coordinates (rows, 0-50)
         np.zeros_like(simulated_map),
         facecolors=cm.coolwarm(simulated_map),
         zorder=1,
@@ -164,9 +166,14 @@ def plot_trajectories(
     target_threshold = 0.7
     target_positions = np.where(simulated_map > target_threshold)
     if len(target_positions[0]) > 0:
+        # simulated_map[row, col] -> world coordinates (x, y)
+        # row corresponds to Y, col corresponds to X
+        target_y_pixels = target_positions[0]  # row indices
+        target_x_pixels = target_positions[1]  # column indices
+        
         # Convert pixel coordinates to world coordinates
-        target_x = target_positions[1] * (50.0 / map_width)
-        target_y = target_positions[0] * (50.0 / map_height)
+        target_x = target_x_pixels * (50.0 / map_width)   # X in world coords
+        target_y = target_y_pixels * (50.0 / map_height)  # Y in world coords
         
         # Group nearby targets to avoid cluttering
         targets_plotted = set()
@@ -180,8 +187,9 @@ def plot_trajectories(
                     break
             
             if not too_close:
-                # Draw cube for target
-                plot_cube(ax, tx, ty, 0, size=2.0, color='red', alpha=0.9)
+                # Draw cube for target at ground level (z=0)
+                # Cube will be drawn from z=0 to z=size
+                plot_cube(ax, tx, ty, 1.0, size=2.0, color='red', alpha=0.9)
                 targets_plotted.add((tx, ty))
     
     # Plot obstacles (if provided)

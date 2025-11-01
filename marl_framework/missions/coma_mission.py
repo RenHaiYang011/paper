@@ -86,6 +86,9 @@ class COMAMission(Mission):
         self.figure_interval = int(logging_cfg.get("figure_interval", 20))
         self.histogram_interval = int(logging_cfg.get("histogram_interval", 200))
         
+        # Initialize obstacles for visualization
+        self.obstacles = self._generate_obstacles()
+        
         # For ETA calculation
         self.total_training_steps = int(
                 self.num_episodes
@@ -94,6 +97,42 @@ class COMAMission(Mission):
             )
         self.start_time = time.time()
         self.last_time = self.start_time
+
+    def _generate_obstacles(self):
+        """
+        Generate obstacles for visualization based on environment configuration
+        
+        Returns:
+            List of obstacle dictionaries with position and height
+        """
+        obstacles_cfg = self.params.get("visualization", {}).get("obstacles", [])
+        
+        # If obstacles are configured, use them
+        if obstacles_cfg:
+            return obstacles_cfg
+        
+        # Otherwise, generate some default obstacles for visualization
+        # These are example obstacles - in real scenarios, these would come from
+        # environment/sensor data or mission planning
+        x_dim = self.params["environment"]["x_dim"]
+        y_dim = self.params["environment"]["y_dim"]
+        
+        # Generate 3-5 random obstacles distributed across the map
+        np.random.seed(42)  # For reproducibility
+        n_obstacles = np.random.randint(3, 6)
+        obstacles = []
+        
+        for i in range(n_obstacles):
+            obs = {
+                'x': float(np.random.uniform(10, x_dim - 10)),
+                'y': float(np.random.uniform(10, y_dim - 10)),
+                'z': 0,  # Ground level
+                'height': float(np.random.uniform(8, 15)),  # Random height 8-15m
+            }
+            obstacles.append(obs)
+        
+        logger.info(f"🚧 Generated {len(obstacles)} obstacles for visualization")
+        return obstacles
 
     def execute(self):
         logger.info("🚀 Starting COMA mission execution...")
@@ -237,6 +276,7 @@ class COMAMission(Mission):
                                 t_collision,
                                 self.budget,
                                 simulated_map,
+                                obstacles=self.obstacles,  # Pass obstacles for visualization
                             )
 
                         episode_returns.append(episode_return)
