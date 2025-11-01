@@ -73,8 +73,8 @@ def plot_pyramid(ax, x, y, z, height=10, base_size=3.0, color='gray', alpha=0.7)
     
     Args:
         ax: matplotlib 3D axis
-        x, y, z: base center position
-        height: pyramid height
+        x, y, z: base center position (通常z=0，从地面开始)
+        height: pyramid height (向上延伸的高度)
         base_size: base square size
         color: pyramid color
         alpha: transparency
@@ -82,20 +82,20 @@ def plot_pyramid(ax, x, y, z, height=10, base_size=3.0, color='gray', alpha=0.7)
     # Define pyramid vertices
     r = base_size / 2
     vertices = np.array([
-        [x-r, y-r, z],      # base corner 1
-        [x+r, y-r, z],      # base corner 2
-        [x+r, y+r, z],      # base corner 3
-        [x-r, y+r, z],      # base corner 4
-        [x, y, z+height]    # apex
+        [x-r, y-r, z],          # base corner 1 (底面角1)
+        [x+r, y-r, z],          # base corner 2 (底面角2)
+        [x+r, y+r, z],          # base corner 3 (底面角3)
+        [x-r, y+r, z],          # base corner 4 (底面角4)
+        [x, y, z+height]        # apex (顶点)
     ])
     
     # Define the 5 faces of the pyramid (4 triangular + 1 square base)
     faces = [
-        [vertices[0], vertices[1], vertices[4]],  # front triangle
-        [vertices[1], vertices[2], vertices[4]],  # right triangle
-        [vertices[2], vertices[3], vertices[4]],  # back triangle
-        [vertices[3], vertices[0], vertices[4]],  # left triangle
-        [vertices[0], vertices[1], vertices[2], vertices[3]]  # base square
+        [vertices[0], vertices[1], vertices[4]],  # front triangle (前面三角形)
+        [vertices[1], vertices[2], vertices[4]],  # right triangle (右面三角形)
+        [vertices[2], vertices[3], vertices[4]],  # back triangle (后面三角形)
+        [vertices[3], vertices[0], vertices[4]],  # left triangle (左面三角形)
+        [vertices[0], vertices[1], vertices[2], vertices[3]]  # base square (底面正方形)
     ]
     
     # Plot each face
@@ -107,10 +107,20 @@ def plot_pyramid(ax, x, y, z, height=10, base_size=3.0, color='gray', alpha=0.7)
     else:
         edge_color = 'black'
     
+    # 创建3D多边形集合，设置合适的zorder确保显示在地图上方
     pyramid = Poly3DCollection(faces, alpha=alpha, facecolor=color,
-                              edgecolor=edge_color, linewidths=2.0)
-    pyramid.set_zsort('max')  # 确保金字塔在上层显示
+                              edgecolor=edge_color, linewidths=1.5)
+    pyramid.set_zsort('average')  # 使用average排序，确保3D效果
     ax.add_collection3d(pyramid)
+    
+    # 为了增强3D效果，在障碍物底部添加一个稍微暗一点的圆形阴影
+    circle_theta = np.linspace(0, 2*np.pi, 20)
+    shadow_x = x + (base_size/2) * np.cos(circle_theta)
+    shadow_y = y + (base_size/2) * np.sin(circle_theta)
+    shadow_z = np.full_like(shadow_x, z + 0.1)  # 稍微高于地面
+    
+    # 添加阴影效果
+    ax.plot(shadow_x, shadow_y, shadow_z, color='gray', alpha=0.3, linewidth=2)
 
 
 # ==================== Main Plotting Functions ====================
@@ -196,58 +206,37 @@ def plot_trajectories(
     y_coords = np.linspace(0, actual_y_coverage, map_height)  # rows -> Y
     X, Y = np.meshgrid(x_coords, y_coords)                    # X: columns, Y: rows
     
-    # Plot ground surface with proper coordinate alignment - 去掉透明度，清晰显示目标/非目标区域
-    # 确保地图在 z=0 平面，作为底层
+    # Plot ground surface with proper coordinate alignment - 确保地图在底层
+    # 地图在 z=0 平面，作为基础底面
     surface = ax.plot_surface(
         X,  # X coordinates (columns, 0-50)
         Y,  # Y coordinates (rows, 0-50)
-        np.zeros_like(simulated_map),  # 确保地图在 z=0
+        np.zeros_like(simulated_map),  # 地图在z=0平面
         facecolors=cm.coolwarm(simulated_map),
-        zorder=1,  # 底层
+        zorder=1,  # 地图在底层
         alpha=1.0,  # 完全不透明，清晰显示红蓝色区域对比
         shade=False,  # 减少阴影效果，让颜色更清晰
     )
     
-    # 注释掉目标立方体绘制 - 删除绿色立方体
-    # Extract and plot targets (high probability regions > 0.7)
-    # target_threshold = 0.7
-    # target_positions = np.where(simulated_map > target_threshold)
-    # if len(target_positions[0]) > 0:
-    #     # simulated_map[row, col] -> world coordinates (x, y)
-    #     # row corresponds to Y, col corresponds to X
-    #     target_y_pixels = target_positions[0]  # row indices
-    #     target_x_pixels = target_positions[1]  # column indices
-    #     
-    #     # Convert pixel coordinates to world coordinates
-    #     target_x = target_x_pixels * (50.0 / map_width)   # X in world coords
-    #     target_y = target_y_pixels * (50.0 / map_height)  # Y in world coords
-    #     
-    #     # Group nearby targets to avoid cluttering
-    #     targets_plotted = set()
-    #     for i in range(len(target_x)):
-    #         tx, ty = target_x[i], target_y[i]
-    #         # Check if this target is too close to already plotted ones
-    #         too_close = False
-    #         for plotted in targets_plotted:
-    #             if np.sqrt((tx - plotted[0])**2 + (ty - plotted[1])**2) < 3:
-    #                 too_close = True
-    #                 break
-    #         
-    #         if not too_close:
-    #             # Draw cube for target - 提高高度和zorder确保可见性
-    #             # Use bright green for high contrast against red map areas
-    #             plot_cube(ax, tx, ty, 3.0, size=2.5, color='lime', alpha=0.95)  # 提高到3米高度，增大尺寸
-    #             targets_plotted.add((tx, ty))
-    
-    # Plot obstacles (if provided) - 保留黄色障碍物金字塔，调整参数使其更明显地站在地图上
+    # Plot obstacles AFTER map to ensure proper layering
+    # 障碍物绘制在地图之后，确保显示在上层
     if obstacles is not None and len(obstacles) > 0:
-        for obs in obstacles:
+        print(f"PLOT DEBUG: 绘制 {len(obstacles)} 个障碍物")
+        for i, obs in enumerate(obstacles):
             obs_x, obs_y, obs_z = obs['x'], obs['y'], obs['z']
             obs_height = obs.get('height', 10)
-            # Draw pyramid/cone for obstacle in yellow for visibility
-            # 增加不透明度和基座大小，使障碍物更显眼，更"贴地"
-            plot_pyramid(ax, obs_x, obs_y, obs_z, height=obs_height, 
-                        base_size=4.0, color='yellow', alpha=0.95)
+            print(f"PLOT DEBUG: 障碍物 {i+1}: ({obs_x}, {obs_y}, {obs_z}) 高度: {obs_height}")
+            
+            # 障碍物从地面(z=0)开始向上延伸，创建真正的3D立体效果
+            plot_pyramid(ax, obs_x, obs_y, 0, height=obs_height, 
+                        base_size=4.0, color='yellow', alpha=0.9)
+            
+            # 在障碍物顶部添加红色标记确保可见性
+            ax.scatter([obs_x], [obs_y], [obs_height + 2], 
+                      color='red', s=150, marker='X', zorder=150, 
+                      edgecolors='darkred', linewidths=2)
+    else:
+        print(f"PLOT DEBUG: 没有障碍物数据")
     
     # Plot agent trajectories
     for agent_id in range(n_agents):
@@ -269,30 +258,38 @@ def plot_trajectories(
             ax.scatter(x[0], y[0], z[0], color=colors[agent_id], 
                       s=100, marker='o', zorder=101, edgecolors='black', linewidths=2)
     
-    # Set viewing angle - 调整视角让障碍物看起来真正在地图上
-    ax.view_init(elev=25, azim=60)  # 降低仰角，调整方位角，更好的3D效果
+    # Set viewing angle for better 3D effect - 调整视角让障碍物真正看起来立在地图上
+    ax.view_init(elev=30, azim=45)  # 稍微提高仰角，调整方位角，获得更好的3D立体感
 
     # Use dynamic limits based on actual world coordinate coverage
     ax.set_xlim(0, actual_x_coverage)
     ax.set_ylim(0, actual_y_coverage)
     
-    # Get altitude range from agent positions
+    # Get altitude range from agent positions and obstacles
     all_altitudes = [pos[agent_id][2] for agent_id in range(n_agents) for pos in agent_positions]
+    
+    # Include obstacle heights in altitude calculation
+    if obstacles is not None and len(obstacles) > 0:
+        obstacle_heights = [obs['z'] + obs.get('height', 10) for obs in obstacles]
+        all_altitudes.extend(obstacle_heights)
+        print(f"PLOT DEBUG: 障碍物最高点: {max(obstacle_heights):.1f}米")
+    
     if all_altitudes:
         min_alt = min(all_altitudes)
         max_alt = max(all_altitudes)
-        # Add some padding, but ensure obstacle heights are visible
-        z_min = 0  # 固定从地面开始
-        z_max = max(max_alt + 5, 20)  # 确保障碍物可见
+        # Add padding to ensure all obstacles are visible
+        z_min = 0  # 从地面开始，不要负值
+        z_max = max(max_alt + 8, 25)  # 确保最高障碍物+padding都可见
         ax.set_zlim(z_min, z_max)
+        print(f"PLOT DEBUG: Z轴范围: [{z_min}, {z_max}]")
         # Set z ticks dynamically
-        z_step = max(5, int((z_max - z_min) / 4))
+        z_step = max(5, int((z_max - z_min) / 5))
         z_ticks = list(range(int(z_min), int(z_max) + 1, z_step))
         if z_ticks:
             ax.set_zticks(z_ticks)
     else:
-        ax.set_zlim(0, 25)  # 稍微提高上限以显示障碍物
-        ax.set_zticks([0, 5, 10, 15, 20, 25])
+        ax.set_zlim(0, 30)  # 从0开始，不要负值
+        ax.set_zticks([0, 5, 10, 15, 20, 25, 30])
     
     # Set x/y ticks to match actual world coordinates
     x_tick_step = actual_x_coverage / 5  # 5 intervals
