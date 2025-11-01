@@ -170,47 +170,48 @@ def plot_trajectories(
     y_coords = np.linspace(0, 50, map_height)  # rows -> Y
     X, Y = np.meshgrid(x_coords, y_coords)     # X: columns, Y: rows
     
-    # Plot ground surface with proper coordinate alignment
+    # Plot ground surface with proper coordinate alignment - 去掉透明度，清晰显示目标/非目标区域
     surface = ax.plot_surface(
         X,  # X coordinates (columns, 0-50)
         Y,  # Y coordinates (rows, 0-50)
         np.zeros_like(simulated_map),
         facecolors=cm.coolwarm(simulated_map),
         zorder=1,
-        alpha=0.6,  # 降低地图透明度，让立方体更明显
+        alpha=1.0,  # 完全不透明，清晰显示红蓝色区域对比
     )
     
+    # 注释掉目标立方体绘制 - 根据用户要求删除绿色立方体
     # Extract and plot targets (high probability regions > 0.7)
-    target_threshold = 0.7
-    target_positions = np.where(simulated_map > target_threshold)
-    if len(target_positions[0]) > 0:
-        # simulated_map[row, col] -> world coordinates (x, y)
-        # row corresponds to Y, col corresponds to X
-        target_y_pixels = target_positions[0]  # row indices
-        target_x_pixels = target_positions[1]  # column indices
-        
-        # Convert pixel coordinates to world coordinates
-        target_x = target_x_pixels * (50.0 / map_width)   # X in world coords
-        target_y = target_y_pixels * (50.0 / map_height)  # Y in world coords
-        
-        # Group nearby targets to avoid cluttering
-        targets_plotted = set()
-        for i in range(len(target_x)):
-            tx, ty = target_x[i], target_y[i]
-            # Check if this target is too close to already plotted ones
-            too_close = False
-            for plotted in targets_plotted:
-                if np.sqrt((tx - plotted[0])**2 + (ty - plotted[1])**2) < 3:
-                    too_close = True
-                    break
-            
-            if not too_close:
-                # Draw cube for target - 提高高度和zorder确保可见性
-                # Use bright green for high contrast against red map areas
-                plot_cube(ax, tx, ty, 3.0, size=2.5, color='lime', alpha=0.95)  # 提高到3米高度，增大尺寸
-                targets_plotted.add((tx, ty))
+    # target_threshold = 0.7
+    # target_positions = np.where(simulated_map > target_threshold)
+    # if len(target_positions[0]) > 0:
+    #     # simulated_map[row, col] -> world coordinates (x, y)
+    #     # row corresponds to Y, col corresponds to X
+    #     target_y_pixels = target_positions[0]  # row indices
+    #     target_x_pixels = target_positions[1]  # column indices
+    #     
+    #     # Convert pixel coordinates to world coordinates
+    #     target_x = target_x_pixels * (50.0 / map_width)   # X in world coords
+    #     target_y = target_y_pixels * (50.0 / map_height)  # Y in world coords
+    #     
+    #     # Group nearby targets to avoid cluttering
+    #     targets_plotted = set()
+    #     for i in range(len(target_x)):
+    #         tx, ty = target_x[i], target_y[i]
+    #         # Check if this target is too close to already plotted ones
+    #         too_close = False
+    #         for plotted in targets_plotted:
+    #             if np.sqrt((tx - plotted[0])**2 + (ty - plotted[1])**2) < 3:
+    #                 too_close = True
+    #                 break
+    #         
+    #         if not too_close:
+    #             # Draw cube for target - 提高高度和zorder确保可见性
+    #             # Use bright green for high contrast against red map areas
+    #             plot_cube(ax, tx, ty, 3.0, size=2.5, color='lime', alpha=0.95)  # 提高到3米高度，增大尺寸
+    #             targets_plotted.add((tx, ty))
     
-    # Plot obstacles (if provided)
+    # Plot obstacles (if provided) - 保留黄色障碍物金字塔
     if obstacles is not None and len(obstacles) > 0:
         for obs in obstacles:
             obs_x, obs_y, obs_z = obs['x'], obs['y'], obs['z']
@@ -279,13 +280,12 @@ def plot_trajectories(
     ax.set_title(f'UAV Search Trajectories - Step {training_step_index}', 
                 fontsize=12, fontweight='bold', pad=15)
     
-    # Add legend
+    # Add legend - 只保留智能体轨迹的图例
     ax.legend(loc='upper left', fontsize=8, framealpha=0.9)
     
-    # Add custom legend for targets and obstacles
+    # Add custom legend for obstacles only - 移除目标立方体图例
     from matplotlib.patches import Patch
     legend_elements = [
-        Patch(facecolor='lime', edgecolor='darkgreen', label='Target (Green Cube)', alpha=0.95),
         Patch(facecolor='yellow', edgecolor='darkorange', label='Obstacle (Yellow Pyramid)', alpha=0.85),
     ]
     ax.legend(handles=legend_elements, loc='upper right', fontsize=8, framealpha=0.9)
