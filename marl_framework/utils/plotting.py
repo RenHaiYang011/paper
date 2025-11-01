@@ -8,7 +8,7 @@ from typing import Optional, List, Dict
 # Plot each face
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 matplotlib.use("Agg")
-
+import math
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
@@ -162,13 +162,39 @@ def plot_trajectories(
     # Use actual simulated_map shape instead of hardcoded (493, 493)
     map_height, map_width = simulated_map.shape
     
-    # Create coordinate meshgrid in world coordinates (0-50 range)
+    # CRITICAL FIX: Calculate exact world coverage based on grid map resolution
+    # The grid map resolution is calculated from sensor parameters in grid_maps.py:
+    # res = (2 * min_altitude * tan(angle/2)) / pixel_number
+    # Using default params from params_fast.yaml:
+    # - min_altitude = 5m, angle_x = angle_y = 60°, number_x = number_y = 57
+    # - res = (2 * 5 * tan(30°)) / 57 = (10 * 0.577) / 57 ≈ 0.1013 m/pixel
+    # - Grid size: 50m / 0.1013 ≈ 493 pixels
+    # - Actual coverage: 493 * 0.1013 ≈ 49.94m (NOT 50.0m!)
+    
+
+    
+    # Calculate exact resolution to match grid_maps.py calculations
+    min_altitude = 5  # Default from params_fast.yaml
+    angle_degrees = 60  # Default field_of_view
+    pixel_number = 57   # Default pixel number
+    
+    # Exact resolution calculation matching GridMap.res_x property
+    resolution = (2 * min_altitude * math.tan(math.radians(angle_degrees) * 0.5)) / pixel_number
+    
+    # Calculate actual world coverage to match grid_maps.py exactly
+    actual_x_coverage = map_width * resolution
+    actual_y_coverage = map_height * resolution
+    
+    print(f"PLOT DEBUG: Map size: {map_width}×{map_height}, Resolution: {resolution:.6f} m/pixel")
+    print(f"PLOT DEBUG: Actual coverage: {actual_x_coverage:.4f}×{actual_y_coverage:.4f} meters")
+    
+    # Create coordinate meshgrid using EXACT coverage (not assumed 50m)
     # CRITICAL: meshgrid must match plot_surface X,Y ordering
     # simulated_map is indexed as [row, col] = [y, x]
     # For plot_surface(X, Y, Z): X varies along columns, Y varies along rows
-    x_coords = np.linspace(0, 50, map_width)   # columns -> X
-    y_coords = np.linspace(0, 50, map_height)  # rows -> Y
-    X, Y = np.meshgrid(x_coords, y_coords)     # X: columns, Y: rows
+    x_coords = np.linspace(0, actual_x_coverage, map_width)   # columns -> X
+    y_coords = np.linspace(0, actual_y_coverage, map_height)  # rows -> Y
+    X, Y = np.meshgrid(x_coords, y_coords)                    # X: columns, Y: rows
     
     # Plot ground surface with proper coordinate alignment - 去掉透明度，清晰显示目标/非目标区域
     # 确保地图在 z=0 平面，作为底层
@@ -182,7 +208,7 @@ def plot_trajectories(
         shade=False,  # 减少阴影效果，让颜色更清晰
     )
     
-    # 注释掉目标立方体绘制 - 根据用户要求删除绿色立方体
+    # 注释掉目标立方体绘制 - 删除绿色立方体
     # Extract and plot targets (high probability regions > 0.7)
     # target_threshold = 0.7
     # target_positions = np.where(simulated_map > target_threshold)
@@ -246,9 +272,9 @@ def plot_trajectories(
     # Set viewing angle - 调整视角让障碍物看起来真正在地图上
     ax.view_init(elev=25, azim=60)  # 降低仰角，调整方位角，更好的3D效果
 
-    # Use dynamic limits based on world coordinate system (0-50)
-    ax.set_xlim(0, 50)
-    ax.set_ylim(0, 50)
+    # Use dynamic limits based on actual world coordinate coverage
+    ax.set_xlim(0, actual_x_coverage)
+    ax.set_ylim(0, actual_y_coverage)
     
     # Get altitude range from agent positions
     all_altitudes = [pos[agent_id][2] for agent_id in range(n_agents) for pos in agent_positions]
@@ -268,11 +294,16 @@ def plot_trajectories(
         ax.set_zlim(0, 25)  # 稍微提高上限以显示障碍物
         ax.set_zticks([0, 5, 10, 15, 20, 25])
     
-    # Set x/y ticks to match world coordinates (0-50)
-    ax.set_xticks([0, 10, 20, 30, 40, 50])
-    ax.set_xticklabels([0, 10, 20, 30, 40, 50])
-    ax.set_yticks([0, 10, 20, 30, 40, 50])
-    ax.set_yticklabels([0, 10, 20, 30, 40, 50])
+    # Set x/y ticks to match actual world coordinates
+    x_tick_step = actual_x_coverage / 5  # 5 intervals
+    y_tick_step = actual_y_coverage / 5  # 5 intervals
+    x_ticks = [i * x_tick_step for i in range(6)]  # 0, 10, 20, 30, 40, 50 (approx)
+    y_ticks = [i * y_tick_step for i in range(6)]  # 0, 10, 20, 30, 40, 50 (approx)
+    
+    ax.set_xticks(x_ticks)
+    ax.set_xticklabels([f'{tick:.1f}' for tick in x_ticks])
+    ax.set_yticks(y_ticks)
+    ax.set_yticklabels([f'{tick:.1f}' for tick in y_ticks])
     
     # Add axis labels
     ax.set_xlabel('X Position (m)', fontsize=10, labelpad=8)

@@ -71,10 +71,15 @@ def generate_region_based_map(params: Dict, y_dim: int, x_dim: int, episode: int
             # 填充到地图中
             field[y_min_px:y_max_px, x_min_px:x_max_px] = region_targets
             
-            logger.info(f"Generated {region['name']}: "
-                       f"pixels [{x_min_px}, {y_min_px}] to [{x_max_px}, {y_max_px}], "
-                       f"target_prob={target_prob:.2f}, "
-                       f"actual_density={region_targets.mean():.2f}")
+            # 只在第一个episode或每100个episode时记录详细日志
+            if episode == 0 or episode % 100 == 0:
+                logger.info(f"Episode {episode} - Generated {region['name']}: "
+                           f"pixels [{x_min_px}, {y_min_px}] to [{x_max_px}, {y_max_px}], "
+                           f"target_prob={target_prob:.2f}, "
+                           f"actual_density={region_targets.mean():.2f}")
+            else:
+                # 使用 debug 级别，正常训练时不显示
+                logger.debug(f"Episode {episode} - Generated {region['name']}: density={region_targets.mean():.2f}")
     
     return field
 

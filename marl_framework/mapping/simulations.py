@@ -43,7 +43,14 @@ class Simulation:
         map_type = self.params.get("sensor", {}).get("simulation", {}).get("map_type", "random_field")
         
         if map_type == "region_based":
-            logger.info(f"Generating region-based target map for episode {episode}")
+            # 只在开始和每100个episode时记录
+            if episode == 0:
+                logger.info(f"Using region-based target map generation (episode {episode})")
+            elif episode % 100 == 0:
+                logger.info(f"Region-based map generation continuing (episode {episode})")
+            else:
+                logger.debug(f"Generating region-based target map for episode {episode}")
+                
             return ground_truths_region_based.generate_region_based_map(
                 self.params,
                 self.y_dim_pixel,
