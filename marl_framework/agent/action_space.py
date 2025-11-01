@@ -1,5 +1,5 @@
 import logging
-from typing import Dict
+from typing import Dict, Optional
 
 import numpy as np
 
@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 
 class AgentActionSpace:
-    def __init__(self, params: Dict):
+    def __init__(self, params: Dict, obstacle_manager=None):
         self.params = params
         self.spacing = params["experiment"]["constraints"]["spacing"]
         self.min_altitude = params["experiment"]["constraints"]["min_altitude"]
@@ -21,6 +21,9 @@ class AgentActionSpace:
         self.space_dim = np.array(
             [self.space_x_dim, self.space_y_dim, self.space_z_dim]
         )
+        
+        # 障碍物管理器（用于避障）
+        self.obstacle_manager = obstacle_manager
 
     def get_action_mask(self, position):
 
@@ -587,3 +590,40 @@ class AgentActionSpace:
                     mask[26] = 0
 
         return mask
+    
+    def apply_obstacle_mask(self, position, mask, agent_state_space):
+        """
+        应用障碍物掩码，屏蔽会导致与障碍物碰撞的动作
+        
+        Args:
+            position: 当前位置 [x, y, z]
+            mask: 当前动作掩码
+            agent_state_space: 智能体状态空间
+            
+        Returns:
+            更新后的动作掩码
+        """
+        if self.obstacle_manager is None or not self.obstacle_manager.enabled:
+            return mask
+        
+        # 获取所有可能的下一步位置
+        possible_next_positions = []
+        for action in range(self.num_actions):
+            next_pos = self.action_to_position(position, action)
+            possible_next_positions.append(next_pos)
+        
+        # 获取安全动作掩码
+        obstacle_mask = self.obstacle_manager.get_safe_actions_mask(
+            position, possible_next_positions
+        )
+        
+        # 合并掩码（两个掩码都为1时才为1）
+        combined_mask = mask * obstacle_mask
+        
+        # 如果所有动作都被屏蔽，保留原掩码（避免无动作可选）
+        if np.sum(combined_mask) == 0:
+            logger.warning(f"All actions blocked by obstacles at position {position}, "
+                          f"keeping original mask")
+            return mask
+        
+        return combined_mask

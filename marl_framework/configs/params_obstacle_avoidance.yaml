@@ -1,0 +1,70 @@
+# 带障碍物避障的配置文件示例
+
+environment:
+  x_dim: 50
+  y_dim: 50
+
+sensor:
+  pixel:
+    number_x: 57
+    number_y: 57
+  field_of_view:
+    angle_x: 60
+    angle_y: 60
+
+experiment:
+  constraints:
+    spacing: 5
+    min_altitude: 5
+    max_altitude: 25
+    num_actions: 27  # 3D动作空间
+  
+  missions:
+    type: "coma"
+    budget: 25
+  
+  # 障碍物配置
+  obstacles:
+    enable: true  # 启用障碍物避障
+    safety_margin: 2.0  # 安全边界（米）
+    collision_penalty: 50.0  # 完全碰撞的惩罚值
+    
+    # 固定障碍物列表（可选）
+    # 如果不指定，将自动生成随机障碍物
+    fixed_obstacles:
+      - x: 12.0
+        y: 10.0
+        z: 0.0
+        height: 8.0
+        radius: 2.75
+      - x: 26.0
+        y: 5.0
+        z: 0.0
+        height: 12.0
+        radius: 2.75
+      - x: 28.0
+        y: 31.0
+        z: 0.0
+        height: 6.0
+        radius: 2.75
+  
+  # 可视化配置
+  visualization:
+    enable_3d_plot: true
+    plot_frequency: 5  # 每5步保存一次轨迹图
+
+# 奖励函数配置
+reward:
+  coverage_weight: 1.0
+  distance_weight: 0.1
+  footprint_weight: 0.5
+  collision_weight: 10.0
+  obstacle_penalty_weight: 1.0  # 障碍物惩罚权重
+  altitude_diversity_weight: 0.2
+
+# 训练配置
+training:
+  n_episodes: 1000
+  batch_size: 32
+  learning_rate: 0.0003
+  gamma: 0.99

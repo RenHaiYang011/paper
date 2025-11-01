@@ -77,6 +77,11 @@ class Agent:
         action_mask_1d = self.action_space.apply_collision_mask(
             self.position, action_mask_1d, next_other_positions, self.agent_state_space
         )
+        
+        # Apply obstacle mask to avoid collisions with obstacles
+        action_mask_1d = self.action_space.apply_obstacle_mask(
+            self.position, action_mask_1d, self.agent_state_space
+        )
 
         # action choice
         probs, action, mask, eps = self.actor_network.get_action_index(

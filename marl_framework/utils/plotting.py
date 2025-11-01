@@ -73,14 +73,17 @@ def plot_pyramid(ax, x, y, z, height=10, base_size=3.0, color='gray', alpha=0.7)
     
     Args:
         ax: matplotlib 3D axis
-        x, y, z: base center position (通常z=0，从地面开始)
+        x, y, z: base center position (从地面开始，通常 z=0 或 z=0.5)
         height: pyramid height (向上延伸的高度)
-        base_size: base square size
+        base_size: base square size (底面正方形边长)
         color: pyramid color
         alpha: transparency
+    
+    注意：使用 ax.plot() 和 ax.plot_trisurf() 确保坐标系统与 agent 轨迹一致
     """
-    # Define pyramid vertices
     r = base_size / 2
+    
+    # Define pyramid vertices
     vertices = np.array([
         [x-r, y-r, z],          # base corner 1 (底面角1)
         [x+r, y-r, z],          # base corner 2 (底面角2)
@@ -89,51 +92,50 @@ def plot_pyramid(ax, x, y, z, height=10, base_size=3.0, color='gray', alpha=0.7)
         [x, y, z+height]        # apex (顶点)
     ])
     
-    # Define the 5 faces of the pyramid (4 triangular + 1 square base)
-    faces = [
-        [vertices[0], vertices[1], vertices[4]],  # front triangle (前面三角形)
-        [vertices[1], vertices[2], vertices[4]],  # right triangle (右面三角形)
-        [vertices[2], vertices[3], vertices[4]],  # back triangle (后面三角形)
-        [vertices[3], vertices[0], vertices[4]],  # left triangle (左面三角形)
-        [vertices[0], vertices[1], vertices[2], vertices[3]]  # base square (底面正方形)
-    ]
-    
-    # Plot each face
-    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-    
     # Use contrasting edge color for visibility
     if color == 'yellow':
         edge_color = 'darkorange'
     else:
         edge_color = 'black'
     
-    # 创建3D多边形集合，增强边缘线宽度让立体感更强
-    pyramid = Poly3DCollection(faces, alpha=alpha, facecolor=color,
-                              edgecolor=edge_color, linewidths=3.0)
-    pyramid.set_zsort('min')  # 使用min排序，让障碍物显示清晰
-    ax.add_collection3d(pyramid)
+    # 绘制底面正方形边框
+    base_x = [x-r, x+r, x+r, x-r, x-r]
+    base_y = [y-r, y-r, y+r, y+r, y-r]
+    base_z = [z, z, z, z, z]
+    ax.plot(base_x, base_y, base_z, color=edge_color, linewidth=2.5, zorder=150)
     
-    # 在障碍物底部周围添加一个灰色基座，增强"立在地面"的视觉效果
-    # 基座比障碍物底面稍大一圈，颜色稍暗，增强3D立体感
-    base_r = base_size / 2 * 1.15  # 基座比障碍物底面大15%
-    base_z = max(0, z - 0.1)  # 基座稍微低一点，但不能低于0
-    base_vertices = np.array([
-        [x-base_r, y-base_r, base_z],
-        [x+base_r, y-base_r, base_z],
-        [x+base_r, y+base_r, base_z],
-        [x-base_r, y+base_r, base_z]
-    ])
-    base_face = [base_vertices]
-    base_patch = Poly3DCollection(base_face, alpha=0.4, facecolor='gray',
-                                 edgecolor='darkgray', linewidths=1.5)
-    base_patch.set_zsort('max')
-    ax.add_collection3d(base_patch)
+    # 绘制从四个底角到顶点的边框线
+    apex_x, apex_y, apex_z = x, y, z+height
+    for i in range(4):
+        ax.plot([vertices[i][0], apex_x], [vertices[i][1], apex_y], [vertices[i][2], apex_z],
+               color=edge_color, linewidth=2.5, zorder=150)
     
-    # 在障碍物四个角画从基座到底面的垂直支撑线，增强立体感
-    r = base_size / 2
-    for corner_x, corner_y in [[x-r, y-r], [x+r, y-r], [x+r, y+r], [x-r, y+r]]:
-        ax.plot([corner_x, corner_x], [corner_y, corner_y], [base_z, z], 
-               color=edge_color, alpha=0.5, linewidth=2.0, linestyle='-')
+    # 使用 ax.plot_trisurf() 填充金字塔面片，确保与边框使用相同坐标系
+    # 增加不透明度，让障碍物看起来更"实心"
+    # 填充4个三角形侧面
+    for i in range(4):
+        next_i = (i + 1) % 4
+        tri_x = [vertices[i][0], vertices[next_i][0], apex_x]
+        tri_y = [vertices[i][1], vertices[next_i][1], apex_y]
+        tri_z = [vertices[i][2], vertices[next_i][2], apex_z]
+        
+        # 使用更高的 alpha 值让面片更实心
+        ax.plot_trisurf(tri_x, tri_y, tri_z, color=color, alpha=0.95, 
+                       edgecolor=edge_color, linewidths=1.5, shade=True, zorder=140)
+    
+    # 填充底面正方形（分成两个三角形）
+    # 三角形1: vertices[0], vertices[1], vertices[2]
+    ax.plot_trisurf([vertices[0][0], vertices[1][0], vertices[2][0]],
+                    [vertices[0][1], vertices[1][1], vertices[2][1]],
+                    [vertices[0][2], vertices[1][2], vertices[2][2]],
+                    color=color, alpha=0.9, edgecolor=edge_color, linewidths=1.5, 
+                    shade=True, zorder=140)
+    # 三角形2: vertices[0], vertices[2], vertices[3]
+    ax.plot_trisurf([vertices[0][0], vertices[2][0], vertices[3][0]],
+                    [vertices[0][1], vertices[2][1], vertices[3][1]],
+                    [vertices[0][2], vertices[2][2], vertices[3][2]],
+                    color=color, alpha=0.9, edgecolor=edge_color, linewidths=1.5,
+                    shade=True, zorder=140)
 
 
 # ==================== Main Plotting Functions ====================
@@ -209,13 +211,15 @@ def plot_trajectories(
     
     # Plot obstacles AFTER map to ensure proper layering
     # 障碍物绘制在地图之后，确保显示在上层
-    # CRITICAL: 障碍物的 x,y 坐标必须与地图坐标系统一致
+    # CRITICAL: 障碍物必须与 agent 轨迹使用相同的坐标系
+    # agent 轨迹使用 ax.plot(x, y, z)，所以障碍物也要用相同的 (x, y) 顺序
     if obstacles is not None and len(obstacles) > 0:
         print(f"PLOT DEBUG: 绘制 {len(obstacles)} 个障碍物")
         print(f"PLOT DEBUG: 地图坐标范围: X[0, {actual_x_coverage:.2f}], Y[0, {actual_y_coverage:.2f}]")
+        print(f"PLOT DEBUG: Agent 轨迹使用 ax.plot(x, y, z)，障碍物必须使用相同坐标系")
         
         for i, obs in enumerate(obstacles):
-            # 障碍物坐标是世界坐标（米），直接使用
+            # 障碍物坐标是世界坐标（米）
             obs_x, obs_y, obs_z = obs['x'], obs['y'], obs['z']
             obs_height = obs.get('height', 10)
             
@@ -226,10 +230,10 @@ def plot_trajectories(
                 # 障碍物从 z=0.5 开始向上延伸（稍微悬浮避免与地图 z=0 重叠）
                 obstacle_base_z = 0.5
                 
-                # 直接使用世界坐标绘制，与地图坐标系统一致
-                # 增大 base_size 让障碍物更明显醒目
+                # CRITICAL FIX: 使用与 agent 轨迹相同的坐标顺序
+                # agent 使用 ax.plot(x, y, z)，所以障碍物也要传入 (x, y, z)
                 plot_pyramid(ax, obs_x, obs_y, obstacle_base_z, height=obs_height, 
-                            base_size=5.5, color='yellow', alpha=0.9)
+                            base_size=5.5, color='yellow', alpha=0.85)
             else:
                 print(f"PLOT DEBUG: 障碍物 {i+1}: 坐标({obs_x}, {obs_y}) ✗ 超出地图范围!")
     else:

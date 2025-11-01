@@ -53,6 +53,9 @@ def get_global_reward(
     mission_failure_penalty: float = -50.0,
     discovered_targets: set = None,
     total_targets: int = None,
+    # Obstacle avoidance parameters
+    obstacle_manager = None,
+    obstacle_penalty_weight: float = 1.0,
 ):
     done = False
     reward = 0
@@ -111,6 +114,18 @@ def get_global_reward(
                 absolute_reward -= float(collision_weight) * coll_pen
     except Exception:
         coll_pen = 0.0
+    
+    # obstacle collision penalty: if agent is near or in obstacle, apply penalty
+    obstacle_pen = 0.0
+    try:
+        if obstacle_manager is not None and obstacle_manager.enabled and agent_id is not None:
+            if next_positions is not None and len(next_positions) > agent_id:
+                agent_position = np.array(next_positions[agent_id])
+                obstacle_pen = obstacle_manager.get_collision_penalty(agent_position)
+                if obstacle_pen > 0:
+                    absolute_reward -= float(obstacle_penalty_weight) * obstacle_pen
+    except Exception as e:
+        obstacle_pen = 0.0
 
     # altitude diversity bonus: encourage agents to explore different altitudes
     altitude_bonus = 0.0
