@@ -63,6 +63,7 @@ def plot_cube(ax, x, y, z, size=1.0, color='red', alpha=0.8):
     
     cube = Poly3DCollection(faces, alpha=alpha, facecolor=color, 
                            edgecolor=edge_color, linewidths=2.0)
+    cube.set_zsort('max')  # 确保立方体在上层显示
     ax.add_collection3d(cube)
 
 
@@ -108,6 +109,7 @@ def plot_pyramid(ax, x, y, z, height=10, base_size=3.0, color='gray', alpha=0.7)
     
     pyramid = Poly3DCollection(faces, alpha=alpha, facecolor=color,
                               edgecolor=edge_color, linewidths=2.0)
+    pyramid.set_zsort('max')  # 确保金字塔在上层显示
     ax.add_collection3d(pyramid)
 
 
@@ -169,13 +171,13 @@ def plot_trajectories(
     X, Y = np.meshgrid(x_coords, y_coords)     # X: columns, Y: rows
     
     # Plot ground surface with proper coordinate alignment
-    ax.plot_surface(
+    surface = ax.plot_surface(
         X,  # X coordinates (columns, 0-50)
         Y,  # Y coordinates (rows, 0-50)
         np.zeros_like(simulated_map),
         facecolors=cm.coolwarm(simulated_map),
         zorder=1,
-        alpha=0.8,
+        alpha=0.6,  # 降低地图透明度，让立方体更明显
     )
     
     # Extract and plot targets (high probability regions > 0.7)
@@ -203,9 +205,9 @@ def plot_trajectories(
                     break
             
             if not too_close:
-                # Draw cube for target at ground level (z=0)
+                # Draw cube for target - 提高高度和zorder确保可见性
                 # Use bright green for high contrast against red map areas
-                plot_cube(ax, tx, ty, 1.0, size=2.0, color='lime', alpha=0.95)
+                plot_cube(ax, tx, ty, 3.0, size=2.5, color='lime', alpha=0.95)  # 提高到3米高度，增大尺寸
                 targets_plotted.add((tx, ty))
     
     # Plot obstacles (if provided)
