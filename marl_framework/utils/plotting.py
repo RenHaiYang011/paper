@@ -20,6 +20,84 @@ os.makedirs(LOG_PLOTS_DIR, exist_ok=True)
 os.makedirs(RES_PLOTS_DIR, exist_ok=True)
 
 
+# ==================== 3D Shape Drawing Helper Functions ====================
+
+def plot_cube(ax, x, y, z, size=1.0, color='red', alpha=0.8):
+    """
+    Draw a 3D cube at position (x, y, z) to represent a target
+    
+    Args:
+        ax: matplotlib 3D axis
+        x, y, z: center position
+        size: cube size
+        color: cube color
+        alpha: transparency
+    """
+    # Define cube vertices relative to center
+    r = size / 2
+    vertices = np.array([
+        [x-r, y-r, z-r], [x+r, y-r, z-r], [x+r, y+r, z-r], [x-r, y+r, z-r],  # bottom
+        [x-r, y-r, z+r], [x+r, y-r, z+r], [x+r, y+r, z+r], [x-r, y+r, z+r]   # top
+    ])
+    
+    # Define the 6 faces of the cube
+    faces = [
+        [vertices[0], vertices[1], vertices[5], vertices[4]],  # front
+        [vertices[2], vertices[3], vertices[7], vertices[6]],  # back
+        [vertices[0], vertices[3], vertices[7], vertices[4]],  # left
+        [vertices[1], vertices[2], vertices[6], vertices[5]],  # right
+        [vertices[0], vertices[1], vertices[2], vertices[3]],  # bottom
+        [vertices[4], vertices[5], vertices[6], vertices[7]]   # top
+    ]
+    
+    # Plot each face
+    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+    cube = Poly3DCollection(faces, alpha=alpha, facecolor=color, 
+                           edgecolor='darkred', linewidths=1.5)
+    ax.add_collection3d(cube)
+
+
+def plot_pyramid(ax, x, y, z, height=10, base_size=3.0, color='gray', alpha=0.7):
+    """
+    Draw a 3D pyramid/cone at position (x, y, z) to represent an obstacle
+    
+    Args:
+        ax: matplotlib 3D axis
+        x, y, z: base center position
+        height: pyramid height
+        base_size: base square size
+        color: pyramid color
+        alpha: transparency
+    """
+    # Define pyramid vertices
+    r = base_size / 2
+    vertices = np.array([
+        [x-r, y-r, z],      # base corner 1
+        [x+r, y-r, z],      # base corner 2
+        [x+r, y+r, z],      # base corner 3
+        [x-r, y+r, z],      # base corner 4
+        [x, y, z+height]    # apex
+    ])
+    
+    # Define the 5 faces of the pyramid (4 triangular + 1 square base)
+    faces = [
+        [vertices[0], vertices[1], vertices[4]],  # front triangle
+        [vertices[1], vertices[2], vertices[4]],  # right triangle
+        [vertices[2], vertices[3], vertices[4]],  # back triangle
+        [vertices[3], vertices[0], vertices[4]],  # left triangle
+        [vertices[0], vertices[1], vertices[2], vertices[3]]  # base square
+    ]
+    
+    # Plot each face
+    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+    pyramid = Poly3DCollection(faces, alpha=alpha, facecolor=color,
+                              edgecolor='black', linewidths=1.5)
+    ax.add_collection3d(pyramid)
+
+
+# ==================== Main Plotting Functions ====================
+
+
 def plot_trajectories(
     agent_positions,
     n_agents,
@@ -28,6 +106,7 @@ def plot_trajectories(
     t_collision,
     budget,
     simulated_map,
+    obstacles=None,
 ):
 
     # colors = ["b", "g", "c", "r", "k", "w", "m", "y"]
@@ -57,21 +136,10 @@ def plot_trajectories(
     # plt.savefig(os.path.join(LOG_PLOTS_DIR, f"coma_pathes_3d_{training_step_index}.png"))
     # writer.add_figure(f"Agent trajectories", plt.gcf(), training_step_index, close=True)
 
-    fig = plt.figure()
+    fig = plt.figure(figsize=(12, 10))
     ax = fig.add_subplot(111, projection="3d")
 
-    # ax = plt.gca(projection='3d')
-
-    colors = ["c", "g", "m", "orange", "k", "w", "m", "y"]
-
-    resolution = 0.1014
-    # plt.figure()
-
-    # simulated_map = cv2.resize(
-    #     simulated_map,
-    #     (51, 51),
-    #     interpolation=cv2.INTER_AREA,
-    # )
+    colors = ["c", "g", "m", "orange", "k", "w", "y", "b"]
 
     # Use actual simulated_map shape instead of hardcoded (493, 493)
     map_height, map_width = simulated_map.shape
@@ -82,28 +150,71 @@ def plot_trajectories(
     world_y = np.linspace(0, 50, map_height)
     Y, X = np.meshgrid(world_x, world_y)
     
+    # Plot ground surface with proper coordinate alignment
     ax.plot_surface(
+        X,  # Swapped X and Y for correct alignment
         Y,
-        X,
         np.zeros_like(simulated_map),
         facecolors=cm.coolwarm(simulated_map),
         zorder=1,
+        alpha=0.8,
     )
-    # plt.colorbar()
-
+    
+    # Extract and plot targets (high probability regions > 0.7)
+    target_threshold = 0.7
+    target_positions = np.where(simulated_map > target_threshold)
+    if len(target_positions[0]) > 0:
+        # Convert pixel coordinates to world coordinates
+        target_x = target_positions[1] * (50.0 / map_width)
+        target_y = target_positions[0] * (50.0 / map_height)
+        
+        # Group nearby targets to avoid cluttering
+        targets_plotted = set()
+        for i in range(len(target_x)):
+            tx, ty = target_x[i], target_y[i]
+            # Check if this target is too close to already plotted ones
+            too_close = False
+            for plotted in targets_plotted:
+                if np.sqrt((tx - plotted[0])**2 + (ty - plotted[1])**2) < 3:
+                    too_close = True
+                    break
+            
+            if not too_close:
+                # Draw cube for target
+                plot_cube(ax, tx, ty, 0, size=2.0, color='red', alpha=0.9)
+                targets_plotted.add((tx, ty))
+    
+    # Plot obstacles (if provided)
+    if obstacles is not None and len(obstacles) > 0:
+        for obs in obstacles:
+            obs_x, obs_y, obs_z = obs['x'], obs['y'], obs['z']
+            obs_height = obs.get('height', 10)
+            # Draw pyramid/cone for obstacle
+            plot_pyramid(ax, obs_x, obs_y, obs_z, height=obs_height, 
+                        base_size=3.0, color='gray', alpha=0.7)
+    
+    # Plot agent trajectories
     for agent_id in range(n_agents):
         x = []
         y = []
         z = []
         for positions in agent_positions:
-            # Use world coordinates directly (no resolution division needed)
+            # Use world coordinates directly
             x.append(positions[agent_id][0])
             y.append(positions[agent_id][1])
             z.append(positions[agent_id][2])
 
-        ax.plot(y, x, z, color=colors[agent_id], linestyle="-", linewidth=6, zorder=100)
-        # ax.plot(y[0], x[0], color=colors[agent_id], marker="o", markersize=14)
-    ax.view_init(40, 50)
+        # Plot trajectory line
+        ax.plot(x, y, z, color=colors[agent_id], linestyle="-", 
+               linewidth=4, zorder=100, label=f'Agent {agent_id+1}')
+        
+        # Mark start position with sphere
+        if len(x) > 0:
+            ax.scatter(x[0], y[0], z[0], color=colors[agent_id], 
+                      s=100, marker='o', zorder=101, edgecolors='black', linewidths=2)
+    
+    # Set viewing angle
+    ax.view_init(elev=35, azim=45)
 
     # Use dynamic limits based on world coordinate system (0-50)
     ax.set_xlim(0, 50)
@@ -119,7 +230,7 @@ def plot_trajectories(
         z_max = max_alt + 5
         ax.set_zlim(z_min, z_max)
         # Set z ticks dynamically
-        z_step = max(5, int((z_max - z_min) / 3))
+        z_step = max(5, int((z_max - z_min) / 4))
         z_ticks = list(range(int(z_min), int(z_max) + 1, z_step))
         if z_ticks:
             ax.set_zticks(z_ticks)
@@ -132,10 +243,28 @@ def plot_trajectories(
     ax.set_xticklabels([0, 10, 20, 30, 40, 50])
     ax.set_yticks([0, 10, 20, 30, 40, 50])
     ax.set_yticklabels([0, 10, 20, 30, 40, 50])
+    
+    # Add axis labels
+    ax.set_xlabel('X Position (m)', fontsize=10, labelpad=8)
+    ax.set_ylabel('Y Position (m)', fontsize=10, labelpad=8)
+    ax.set_zlabel('Altitude (m)', fontsize=10, labelpad=8)
+    
+    # Add title
+    ax.set_title(f'UAV Search Trajectories - Step {training_step_index}', 
+                fontsize=12, fontweight='bold', pad=15)
+    
+    # Add legend
+    ax.legend(loc='upper left', fontsize=8, framealpha=0.9)
+    
+    # Add custom legend for targets and obstacles
+    from matplotlib.patches import Patch
+    legend_elements = [
+        Patch(facecolor='red', edgecolor='darkred', label='Target (Cube)', alpha=0.8),
+        Patch(facecolor='gray', edgecolor='black', label='Obstacle (Pyramid)', alpha=0.7),
+    ]
+    ax.legend(handles=legend_elements, loc='upper right', fontsize=8, framealpha=0.9)
 
-    # Save to disk (uncomment if you prefer files)
-    # fig.savefig(os.path.join(LOG_PLOTS_DIR, f"coma_pathes_3d_{training_step_index}.png"))
-    # Add to TensorBoard if writer supplied
+    # Save to disk and TensorBoard
     # Try to add to TensorBoard (if writer provided). Ignore writer errors.
     try:
         writer.add_figure(f"Agent trajectories", fig, training_step_index, close=False)
@@ -147,12 +276,12 @@ def plot_trajectories(
     out_path_log = os.path.join(LOG_PLOTS_DIR, out_name)
     out_path_res = os.path.join(RES_PLOTS_DIR, out_name)
     try:
-        fig.savefig(out_path_log, dpi=150)
+        fig.savefig(out_path_log, dpi=150, bbox_inches='tight')
     except Exception:
         # best effort, continue
         pass
     try:
-        fig.savefig(out_path_res, dpi=150)
+        fig.savefig(out_path_res, dpi=150, bbox_inches='tight')
     except Exception:
         pass
 
