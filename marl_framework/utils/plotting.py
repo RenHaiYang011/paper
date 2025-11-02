@@ -14,6 +14,8 @@ from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import seaborn as sns
 from marl_framework.constants import REPO_DIR
+from matplotlib.patches import Patch
+from matplotlib.patches import Patch
 
 LOG_PLOTS_DIR = os.path.join(REPO_DIR, "log", "plots")
 RES_PLOTS_DIR = os.path.join(REPO_DIR, "res", "plots")
@@ -284,7 +286,7 @@ def plot_trajectories(
     ax.legend(loc='upper left', fontsize=8, framealpha=0.9)
     
     # Add custom legend for obstacles only - 移除目标立方体图例
-    from matplotlib.patches import Patch
+    
     legend_elements = [
         Patch(facecolor='yellow', edgecolor='darkorange', label='Obstacle (Yellow Pyramid)', alpha=0.85),
     ]
@@ -400,7 +402,7 @@ def plot_trajectories(
                      edgecolor='black', fancybox=True, shadow=True)
     
     # 添加障碍物图例
-    from matplotlib.patches import Patch
+    
     legend_elements_topdown = [
         Patch(facecolor='yellow', edgecolor='darkorange', 
               label='Obstacle Zone', alpha=0.6),
