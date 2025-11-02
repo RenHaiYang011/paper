@@ -18,6 +18,7 @@ class Agent:
         mapping,
         agent_id: int,
         agent_state_space: AgentStateSpace,
+        obstacle_manager=None,
     ):
         self.params = params
         self.agent_id = agent_id
@@ -30,7 +31,7 @@ class Agent:
         self.mapping = mapping
         self.local_map = mapping.init_priors()
         self.agent_state_space = agent_state_space
-        self.action_space = AgentActionSpace(self.params)
+        self.action_space = AgentActionSpace(self.params, obstacle_manager=obstacle_manager)
         self.actor_network = actor_network
         self.agent_info = dict()
         self.position = None

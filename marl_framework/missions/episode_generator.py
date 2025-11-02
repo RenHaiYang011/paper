@@ -99,6 +99,7 @@ class EpisodeGenerator:
                     mapping,
                     agent_id,
                     coma_wrapper.agent_state_space,
+                    obstacle_manager=getattr(coma_wrapper, 'obstacle_manager', None),
                 )
             )
         return agents

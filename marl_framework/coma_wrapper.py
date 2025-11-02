@@ -59,6 +59,9 @@ class COMAWrapper:
             self.coordination_manager = CoordinationManager(params, self.n_agents)
             logger.info("CoordinationManager initialized for multi-agent coordination")
         
+        # Obstacle avoidance manager
+        self.obstacle_manager = None
+        
         # Initialize networks and move to GPU
         import constants
         self.actor_network = ActorNetwork(self.params).to(constants.DEVICE)
@@ -76,6 +79,11 @@ class COMAWrapper:
         """Set the search region manager (called from COMAMission)"""
         self.search_region_manager = manager
         logger.info(f"SearchRegionManager attached to COMAWrapper")
+    
+    def set_obstacle_manager(self, manager):
+        """Set the obstacle manager (called from COMAMission)"""
+        self.obstacle_manager = manager
+        logger.info(f"ObstacleManager attached to COMAWrapper")
 
 
     def build_observations(
@@ -203,6 +211,8 @@ class COMAWrapper:
                     global_step=global_step,
                     class_weighting=self.class_weighting,
                     altitude_diversity_weight=self.altitude_diversity_weight,
+                    obstacle_manager=self.obstacle_manager,
+                    obstacle_penalty_weight=self.params["experiment"].get("obstacles", {}).get("obstacle_penalty_weight", 1.0),
                 )
                 batch_memory.insert(-1, agent_id, reward=relative_reward)
 
@@ -257,6 +267,9 @@ class COMAWrapper:
                 spacing=self.params["experiment"]["constraints"]["spacing"],
                 # Coordination parameters
                 coordination_manager=self.coordination_manager,
+                # Obstacle avoidance parameters
+                obstacle_manager=self.obstacle_manager,
+                obstacle_penalty_weight=self.params["experiment"].get("obstacles", {}).get("obstacle_penalty_weight", 1.0),
             )
 
             # log coverage delta and absolute coverage to TensorBoard if writer available

@@ -13,6 +13,7 @@ import marl_framework.constants as constants
 from marl_framework.missions.episode_generator import EpisodeGenerator
 from marl_framework.missions.missions import Mission
 from marl_framework.mapping.search_regions import SearchRegionManager
+from marl_framework.utils.obstacle_manager import ObstacleManager
 
 from batch_memory import BatchMemory
 from coma_wrapper import COMAWrapper
@@ -88,6 +89,30 @@ class COMAMission(Mission):
         
         # Initialize obstacles for visualization
         self.obstacles = self._generate_obstacles()
+        
+        # Initialize ObstacleManager for collision avoidance
+        self.obstacle_manager: Optional[ObstacleManager] = None
+        obstacles_config = self.params.get("experiment", {}).get("obstacles", {})
+        if obstacles_config.get("enable", False):
+            try:
+                self.obstacle_manager = ObstacleManager(self.params)
+                # Set obstacles from config
+                fixed_obstacles = obstacles_config.get("fixed_obstacles", [])
+                if fixed_obstacles:
+                    self.obstacle_manager.set_obstacles(fixed_obstacles)
+                    logger.info(f"✓ ObstacleManager initialized with {len(fixed_obstacles)} obstacles")
+                    logger.info(f"  - Safety margin: {self.obstacle_manager.safety_margin}m")
+                    logger.info(f"  - Collision penalty: {self.obstacle_manager.collision_penalty}")
+                else:
+                    logger.warning("Obstacles enabled but no fixed_obstacles configured")
+                    self.obstacle_manager = None
+            except Exception as e:
+                logger.warning(f"Failed to initialize ObstacleManager: {e}")
+                self.obstacle_manager = None
+        
+        # Attach obstacle_manager to coma_wrapper
+        if self.obstacle_manager:
+            self.coma_wrapper.set_obstacle_manager(self.obstacle_manager)
         
         # For ETA calculation
         self.total_training_steps = int(

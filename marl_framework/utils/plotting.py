@@ -109,33 +109,6 @@ def plot_pyramid(ax, x, y, z, height=10, base_size=3.0, color='gray', alpha=0.7)
     for i in range(4):
         ax.plot([vertices[i][0], apex_x], [vertices[i][1], apex_y], [vertices[i][2], apex_z],
                color=edge_color, linewidth=2.5, zorder=150)
-    
-    # 使用 ax.plot_trisurf() 填充金字塔面片，确保与边框使用相同坐标系
-    # 增加不透明度，让障碍物看起来更"实心"
-    # 填充4个三角形侧面
-    for i in range(4):
-        next_i = (i + 1) % 4
-        tri_x = [vertices[i][0], vertices[next_i][0], apex_x]
-        tri_y = [vertices[i][1], vertices[next_i][1], apex_y]
-        tri_z = [vertices[i][2], vertices[next_i][2], apex_z]
-        
-        # 使用更高的 alpha 值让面片更实心
-        ax.plot_trisurf(tri_x, tri_y, tri_z, color=color, alpha=0.95, 
-                       edgecolor=edge_color, linewidths=1.5, shade=True, zorder=140)
-    
-    # 填充底面正方形（分成两个三角形）
-    # 三角形1: vertices[0], vertices[1], vertices[2]
-    ax.plot_trisurf([vertices[0][0], vertices[1][0], vertices[2][0]],
-                    [vertices[0][1], vertices[1][1], vertices[2][1]],
-                    [vertices[0][2], vertices[1][2], vertices[2][2]],
-                    color=color, alpha=0.9, edgecolor=edge_color, linewidths=1.5, 
-                    shade=True, zorder=140)
-    # 三角形2: vertices[0], vertices[2], vertices[3]
-    ax.plot_trisurf([vertices[0][0], vertices[2][0], vertices[3][0]],
-                    [vertices[0][1], vertices[2][1], vertices[3][1]],
-                    [vertices[0][2], vertices[2][2], vertices[3][2]],
-                    color=color, alpha=0.9, edgecolor=edge_color, linewidths=1.5,
-                    shade=True, zorder=140)
 
 
 # ==================== Main Plotting Functions ====================
@@ -185,9 +158,7 @@ def plot_trajectories(
     actual_x_coverage = map_width * resolution
     actual_y_coverage = map_height * resolution
     
-    print(f"PLOT DEBUG: Map size: {map_width}×{map_height}, Resolution: {resolution:.6f} m/pixel")
-    print(f"PLOT DEBUG: Actual coverage: {actual_x_coverage:.4f}×{actual_y_coverage:.4f} meters")
-    
+   
     # Create coordinate meshgrid using EXACT coverage (not assumed 50m)
     # CRITICAL: meshgrid must match plot_surface X,Y ordering
     # simulated_map is indexed as [row, col] = [y, x]
@@ -214,10 +185,7 @@ def plot_trajectories(
     # CRITICAL: 障碍物必须与 agent 轨迹使用相同的坐标系
     # agent 轨迹使用 ax.plot(x, y, z)，所以障碍物也要用相同的 (x, y) 顺序
     if obstacles is not None and len(obstacles) > 0:
-        print(f"PLOT DEBUG: 绘制 {len(obstacles)} 个障碍物")
-        print(f"PLOT DEBUG: 地图坐标范围: X[0, {actual_x_coverage:.2f}], Y[0, {actual_y_coverage:.2f}]")
-        print(f"PLOT DEBUG: Agent 轨迹使用 ax.plot(x, y, z)，障碍物必须使用相同坐标系")
-        
+
         for i, obs in enumerate(obstacles):
             # 障碍物坐标是世界坐标（米）
             obs_x, obs_y, obs_z = obs['x'], obs['y'], obs['z']
@@ -225,8 +193,7 @@ def plot_trajectories(
             
             # 验证障碍物是否在地图范围内
             if 0 <= obs_x <= actual_x_coverage and 0 <= obs_y <= actual_y_coverage:
-                print(f"PLOT DEBUG: 障碍物 {i+1}: 世界坐标({obs_x:.1f}, {obs_y:.1f}, {obs_z:.1f}) 高度: {obs_height}m ✓ 在地图范围内")
-                
+               
                 # 障碍物从 z=0.5 开始向上延伸（稍微悬浮避免与地图 z=0 重叠）
                 obstacle_base_z = 0.5
                 
@@ -234,10 +201,8 @@ def plot_trajectories(
                 # agent 使用 ax.plot(x, y, z)，所以障碍物也要传入 (x, y, z)
                 plot_pyramid(ax, obs_x, obs_y, obstacle_base_z, height=obs_height, 
                             base_size=5.5, color='yellow', alpha=0.85)
-            else:
-                print(f"PLOT DEBUG: 障碍物 {i+1}: 坐标({obs_x}, {obs_y}) ✗ 超出地图范围!")
-    else:
-        print(f"PLOT DEBUG: 没有障碍物数据")
+            
+    
     
     # Plot agent trajectories
     for agent_id in range(n_agents):
@@ -273,7 +238,7 @@ def plot_trajectories(
     if obstacles is not None and len(obstacles) > 0:
         obstacle_heights = [obs['z'] + obs.get('height', 10) for obs in obstacles]
         all_altitudes.extend(obstacle_heights)
-        print(f"PLOT DEBUG: 障碍物最高点: {max(obstacle_heights):.1f}米")
+    
     
     # 定义地图所在的z平面
     map_z_level = 0  # 地图在 z=0
@@ -285,7 +250,7 @@ def plot_trajectories(
         z_min = 0  # 从地面开始
         z_max = max(max_alt + 8, 25)  # 确保最高障碍物+padding都可见
         ax.set_zlim(z_min, z_max)
-        print(f"PLOT DEBUG: Z轴范围: [{z_min}, {z_max}]")
+        
         # Set z ticks dynamically
         z_step = max(5, int((z_max - z_min) / 5))
         z_ticks = list(range(int(z_min), int(z_max) + 1, z_step))
@@ -348,21 +313,132 @@ def plot_trajectories(
 
     # Close the figure to free memory. If we added to tensorboard with close=False, close here.
     plt.close(fig)
-    # ax = fig.gca(projection='3d')
-    #
-    # for agent_id in range(n_agents):
-    #     x = []
-    #     y = []
-    #     z = []
-    #     for positions in agent_positions:
-    #         x.append(positions[agent_id][0])
-    #         y.append(positions[agent_id][1])
-    #         z.append(positions[agent_id][2])
-    #
-    #     ax.plot(y, x, z, color=colors[agent_id], linestyle="-", linewidth=10)
-
-    # ax.savefig(os.path.join(LOG_PLOTS_DIR, f"ig_pathes_3d_{training_step_index}.png"))
-    # writer.add_figure(f"Agent trajectories - 3D", ax.gcf(), training_step_index, close=True)
+    
+    # ==================== 生成俯视图 (Top-Down View) ====================
+    # 创建第二张图：俯视图
+    fig_topdown = plt.figure(figsize=(12, 10))
+    ax_topdown = fig_topdown.add_subplot(111)
+    
+    # 绘制地图底图 (使用 imshow)
+    ax_topdown.imshow(
+        simulated_map, 
+        extent=[0, actual_x_coverage, 0, actual_y_coverage],
+        origin='lower',  # 确保坐标系正确
+        cmap='coolwarm',
+        alpha=0.8,
+        zorder=1
+    )
+    
+    # 绘制障碍物（俯视图中显示为圆形）
+    if obstacles is not None and len(obstacles) > 0:
+        for obs in obstacles:
+            obs_x, obs_y = obs['x'], obs['y']
+            obs_radius = obs.get('radius', 2.75)  # 使用配置中的半径
+            
+            if 0 <= obs_x <= actual_x_coverage and 0 <= obs_y <= actual_y_coverage:
+                # 绘制障碍物圆形区域
+                circle = Circle(
+                    (obs_x, obs_y), 
+                    obs_radius, 
+                    color='yellow', 
+                    alpha=0.6, 
+                    edgecolor='darkorange', 
+                    linewidth=2.5,
+                    zorder=50
+                )
+                ax_topdown.add_patch(circle)
+                
+                # 在圆心添加 X 标记
+                ax_topdown.plot(obs_x, obs_y, 'x', color='darkorange', 
+                              markersize=8, markeredgewidth=2, zorder=51)
+    
+    # 绘制智能体轨迹（俯视图）
+    for agent_id in range(n_agents):
+        x = []
+        y = []
+        for positions in agent_positions:
+            x.append(positions[agent_id][0])
+            y.append(positions[agent_id][1])
+        
+        # 绘制轨迹线
+        ax_topdown.plot(x, y, color=colors[agent_id], linestyle="-", 
+                       linewidth=3, zorder=100, label=f'Agent {agent_id+1}', 
+                       alpha=0.9)
+        
+        # 标记起始点
+        if len(x) > 0:
+            ax_topdown.scatter(x[0], y[0], color=colors[agent_id], 
+                             s=150, marker='o', zorder=101, 
+                             edgecolors='black', linewidths=2)
+            # 标记结束点
+            ax_topdown.scatter(x[-1], y[-1], color=colors[agent_id], 
+                             s=150, marker='s', zorder=101, 
+                             edgecolors='black', linewidths=2)
+    
+    # 设置坐标轴
+    ax_topdown.set_xlim(0, actual_x_coverage)
+    ax_topdown.set_ylim(0, actual_y_coverage)
+    ax_topdown.set_aspect('equal')
+    
+    # 设置刻度
+    ax_topdown.set_xticks(x_ticks)
+    ax_topdown.set_xticklabels([f'{tick:.1f}' for tick in x_ticks])
+    ax_topdown.set_yticks(y_ticks)
+    ax_topdown.set_yticklabels([f'{tick:.1f}' for tick in y_ticks])
+    
+    # 添加标签
+    ax_topdown.set_xlabel('X Position (m)', fontsize=12, fontweight='bold')
+    ax_topdown.set_ylabel('Y Position (m)', fontsize=12, fontweight='bold')
+    ax_topdown.set_title(f'UAV Search Trajectories (Top-Down View) - Step {training_step_index}', 
+                        fontsize=14, fontweight='bold', pad=15)
+    
+    # 添加网格
+    ax_topdown.grid(True, alpha=0.3, linestyle='--', linewidth=0.5, color='gray', zorder=0)
+    
+    # 添加图例
+    ax_topdown.legend(loc='upper left', fontsize=10, framealpha=0.95, 
+                     edgecolor='black', fancybox=True, shadow=True)
+    
+    # 添加障碍物图例
+    from matplotlib.patches import Patch
+    legend_elements_topdown = [
+        Patch(facecolor='yellow', edgecolor='darkorange', 
+              label='Obstacle Zone', alpha=0.6),
+        plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='gray', 
+                  markersize=10, markeredgecolor='black', markeredgewidth=2, 
+                  label='Start Position', linestyle=''),
+        plt.Line2D([0], [0], marker='s', color='w', markerfacecolor='gray', 
+                  markersize=10, markeredgecolor='black', markeredgewidth=2, 
+                  label='End Position', linestyle=''),
+    ]
+    ax_topdown.legend(handles=legend_elements_topdown, loc='upper right', 
+                     fontsize=9, framealpha=0.95, edgecolor='black', 
+                     fancybox=True, shadow=True)
+    
+    # 保存俯视图到磁盘
+    out_name_topdown = f"coma_pathes_topdown_{training_step_index}.png"
+    out_path_log_topdown = os.path.join(LOG_PLOTS_DIR, out_name_topdown)
+    out_path_res_topdown = os.path.join(RES_PLOTS_DIR, out_name_topdown)
+    
+    try:
+        fig_topdown.savefig(out_path_log_topdown, dpi=150, bbox_inches='tight')
+    except Exception:
+        pass
+    
+    try:
+        fig_topdown.savefig(out_path_res_topdown, dpi=150, bbox_inches='tight')
+    except Exception:
+        pass
+    
+    # 添加到 TensorBoard
+    try:
+        writer.add_figure(f"Agent trajectories - Top Down", fig_topdown, 
+                         training_step_index, close=False)
+    except Exception:
+        pass
+    
+    # 关闭俯视图
+    plt.close(fig_topdown)
 
 
 def plot_performance(budget, entropies):
