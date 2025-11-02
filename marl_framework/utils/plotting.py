@@ -338,11 +338,11 @@ def plot_trajectories(
             obs_radius = obs.get('radius', 2.75)  # 使用配置中的半径
             
             if 0 <= obs_x <= actual_x_coverage and 0 <= obs_y <= actual_y_coverage:
-                # 绘制障碍物圆形区域
+                # 绘制障碍物圆形区域（使用 facecolor 替代 color 避免警告）
                 circle = Circle(
                     (obs_x, obs_y), 
                     obs_radius, 
-                    color='yellow', 
+                    facecolor='yellow', 
                     alpha=0.6, 
                     edgecolor='darkorange', 
                     linewidth=2.5,

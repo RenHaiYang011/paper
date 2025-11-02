@@ -137,7 +137,7 @@ experiment:
   # ==================== 障碍物避障配置 ====================
   obstacles:
     enable: true                    # 启用障碍物避障功能
-    safety_margin: 2.0              # 安全边界（米）- 在障碍物半径外额外2米的缓冲区
+    safety_margin: 1.5              # 安全边界（米）- 在障碍物半径外额外1.5米的缓冲区（从2.0降低以避免过度限制）
     collision_penalty: 50.0         # 完全碰撞的惩罚值
     obstacle_penalty_weight: 1.0    # 障碍物惩罚权重（用于奖励函数）
     
@@ -206,7 +206,7 @@ experiment:
         y: 38.0
         z: 0.0
         height: 7.0
-        radius: 2.75
+        radius: 2.5        # 稍微减小半径，避免过度拥挤
   
   # ==================== 新设计1: 内在奖励机制 (解决稀疏奖励) ====================
   intrinsic_rewards:
