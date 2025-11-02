@@ -620,10 +620,38 @@ class AgentActionSpace:
         # 合并掩码（两个掩码都为1时才为1）
         combined_mask = mask * obstacle_mask
         
-        # 如果所有动作都被屏蔽，保留原掩码（避免无动作可选）
+        # 如果所有动作都被屏蔽，选择"最不坏"的动作（离障碍物最远的）
         if np.sum(combined_mask) == 0:
             logger.warning(f"All actions blocked by obstacles at position {position}, "
-                          f"keeping original mask")
-            return mask
+                          f"choosing least bad action (farthest from obstacles)")
+            
+            # 计算每个有效动作到最近障碍物的距离
+            valid_actions = np.where(mask == 1)[0]
+            if len(valid_actions) == 0:
+                # 如果原始掩码就是空的，返回原掩码
+                return mask
+            
+            max_min_distance = -1
+            best_action = None
+            
+            for action in valid_actions:
+                next_pos = possible_next_positions[action]
+                # 获取到最近障碍物的距离
+                min_distance = self.obstacle_manager.get_nearest_obstacle_distance(next_pos)
+                
+                if min_distance > max_min_distance:
+                    max_min_distance = min_distance
+                    best_action = action
+            
+            # 创建新掩码，只允许"最不坏"的动作
+            if best_action is not None:
+                escape_mask = np.zeros_like(mask)
+                escape_mask[best_action] = 1
+                logger.info(f"Escape action {best_action} selected with distance {max_min_distance:.2f}m from nearest obstacle")
+                return escape_mask
+            else:
+                # 理论上不应该到这里，但保险起见
+                logger.warning(f"Could not find escape action, keeping original mask")
+                return mask
         
         return combined_mask
