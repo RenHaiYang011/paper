@@ -213,6 +213,7 @@ class COMAWrapper:
                     altitude_diversity_weight=self.altitude_diversity_weight,
                     obstacle_manager=self.obstacle_manager,
                     obstacle_penalty_weight=self.params["experiment"].get("obstacles", {}).get("obstacle_penalty_weight", 1.0),
+                    energy_cost_per_step=self.params["experiment"].get("energy_cost_per_step", 0.0),
                 )
                 batch_memory.insert(-1, agent_id, reward=relative_reward)
 
@@ -270,6 +271,8 @@ class COMAWrapper:
                 # Obstacle avoidance parameters
                 obstacle_manager=self.obstacle_manager,
                 obstacle_penalty_weight=self.params["experiment"].get("obstacles", {}).get("obstacle_penalty_weight", 1.0),
+                # Energy cost parameters
+                energy_cost_per_step=self.params["experiment"].get("energy_cost_per_step", 0.0),
             )
 
             # log coverage delta and absolute coverage to TensorBoard if writer available

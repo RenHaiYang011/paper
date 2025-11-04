@@ -342,16 +342,25 @@ class COMAMission(Mission):
     def _safe_add_histogram(self, tag: str, values, step: int):
         """Safely add histogram to TensorBoard, ensuring numeric dtype and robustness.
         - Flattens and casts to float64
-        - Filters non-finite values
+        - Filters non-finite values (NaN, Inf)
+        - Filters very small/large values that cause histogram issues
         - Skips empty arrays
         - Falls back gracefully on TensorBoard TypeErrors
         """
         # First attempt: fast path using numpy conversion
         try:
             vals = np.asarray(values, dtype=np.float64).reshape(-1)
-            # Filter out non-finite values
-            vals = vals[np.isfinite(vals)]
-        except Exception:
+            # Filter out non-finite values (NaN, Inf)
+            finite_mask = np.isfinite(vals)
+            vals = vals[finite_mask]
+            
+            # Additional check: filter extreme values that might cause histogram issues
+            if vals.size > 0:
+                # Remove values that are too extreme (beyond float32 range causes issues)
+                valid_mask = (vals > -1e38) & (vals < 1e38)
+                vals = vals[valid_mask]
+                
+        except Exception as e:
             # Fallback: iterative per-element conversion to float
             vals_list = []
             dropped = 0
@@ -359,8 +368,10 @@ class COMAMission(Mission):
                 for i, v in enumerate(np.ravel(values)):
                     try:
                         fv = float(v)
-                        if np.isfinite(fv):
+                        if np.isfinite(fv) and -1e38 < fv < 1e38:
                             vals_list.append(fv)
+                        else:
+                            dropped += 1
                     except Exception:
                         dropped += 1
                         if dropped <= 5:
@@ -376,24 +387,32 @@ class COMAMission(Mission):
                             except Exception:
                                 pass
                 if len(vals_list) == 0:
+                    logger.debug(f"Skip histogram '{tag}': all values filtered out")
                     return
                 vals = np.asarray(vals_list, dtype=np.float64)
-            except Exception as e:
-                logger.warning(f"Skip histogram '{tag}' due to preprocessing error: {e}")
+            except Exception as ex:
+                logger.warning(f"Skip histogram '{tag}' due to preprocessing error: {ex}")
                 return
 
         if vals.size == 0:
+            logger.debug(f"Skip histogram '{tag}': empty after filtering")
             return
 
+        # Ensure contiguous array for TensorBoard
+        vals = np.ascontiguousarray(vals)
+        
         # Prefer a fixed small bin count to avoid heavy work
         try:
             self.writer.add_histogram(tag, vals, step, bins=50)
-        except TypeError as e:
+        except (TypeError, ValueError, RuntimeError) as e:
             # Some torch TB + numpy versions have a bug path; try alternative bins
             try:
                 self.writer.add_histogram(tag, vals, step, bins='tensorflow')
-            except Exception:
+            except Exception as ex:
                 logger.warning(f"Skip histogram '{tag}' due to writer error: {e}")
+                # Log details for debugging
+                logger.debug(f"  Values shape: {vals.shape}, dtype: {vals.dtype}, "
+                           f"range: [{vals.min():.6f}, {vals.max():.6f}]")
 
     def add_to_tensorboard(
         self,
@@ -577,16 +596,27 @@ class COMAMission(Mission):
             if self.training_step_idx % self.histogram_interval == 0:
                 for tag, params in self.coma_wrapper.critic_network.named_parameters():
                     if params.grad is not None:
-                        vals = params.data.detach().flatten().cpu().numpy()
-                        self._safe_add_histogram(
-                            f"Critic/Parameters/{tag}", vals, self.training_step_idx
-                        )
+                        try:
+                            vals = params.data.detach().flatten().cpu().numpy()
+                            # Extra check: ensure values are valid before passing to histogram
+                            if vals.size > 0 and np.any(np.isfinite(vals)):
+                                self._safe_add_histogram(
+                                    f"Critic/Parameters/{tag}", vals, self.training_step_idx
+                                )
+                        except Exception as e:
+                            logger.debug(f"Skip Critic parameter histogram for {tag}: {e}")
+                            
                 for tag, params in self.coma_wrapper.actor_network.named_parameters():
                     if params.grad is not None:
-                        vals = params.data.detach().flatten().cpu().numpy()
-                        self._safe_add_histogram(
-                            f"Actor/Parameters/{tag}", vals, self.training_step_idx
-                        )
+                        try:
+                            vals = params.data.detach().flatten().cpu().numpy()
+                            # Extra check: ensure values are valid before passing to histogram
+                            if vals.size > 0 and np.any(np.isfinite(vals)):
+                                self._safe_add_histogram(
+                                    f"Actor/Parameters/{tag}", vals, self.training_step_idx
+                                )
+                        except Exception as e:
+                            logger.debug(f"Skip Actor parameter histogram for {tag}: {e}")
 
             self.writer.add_scalar(
                 "Parameters/Actor/Conv1 gradients",

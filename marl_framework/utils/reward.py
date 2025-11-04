@@ -56,6 +56,8 @@ def get_global_reward(
     # Obstacle avoidance parameters
     obstacle_manager = None,
     obstacle_penalty_weight: float = 1.0,
+    # Energy cost parameters
+    energy_cost_per_step: float = 0.0,
 ):
     done = False
     reward = 0
@@ -149,6 +151,16 @@ def get_global_reward(
                         absolute_reward += altitude_bonus
     except Exception as e:
         altitude_bonus = 0.0
+
+    # ==================== Energy Cost Penalty ====================
+    # Fixed energy cost per step to encourage efficient task completion
+    energy_penalty = 0.0
+    try:
+        if float(energy_cost_per_step) > 0.0:
+            energy_penalty = float(energy_cost_per_step)
+            absolute_reward -= energy_penalty
+    except Exception as e:
+        energy_penalty = 0.0
 
     # ==================== Region Search Rewards ====================
     region_rewards = {
@@ -307,6 +319,7 @@ def get_global_reward(
             writer.add_scalar('Penalties/Distance', float(mean_dist), global_step)
             writer.add_scalar('Penalties/Footprint', float(fp_pen), global_step)
             writer.add_scalar('Penalties/Collision', float(coll_pen), global_step)
+            writer.add_scalar('Penalties/Energy_Cost', float(energy_penalty), global_step)
             writer.add_scalar('Bonuses/Altitude_Diversity', float(altitude_bonus), global_step)
             
             # Region search rewards
