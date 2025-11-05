@@ -228,7 +228,8 @@ class COMAMission(Mission):
                         eta_m = int((eta_seconds % 3600) // 60)
                         eta_s = int(eta_seconds % 60)
                         
-                        print(f"Training step: {self.training_step_idx}/{self.total_training_steps}, Step Time: {step_time:.2f}s, ETA: {eta_h:02d}:{eta_m:02d}:{eta_s:02d}")
+                        if self.training_step_idx % 10 == 0:  # 每10步打印一次,避免刷屏
+                            print(f"📊 Training Step: {self.training_step_idx}/{self.total_training_steps} | Episode: {len(self.episode_returns)}/{self.num_episodes} | ETA: {eta_h:02d}:{eta_m:02d}:{eta_s:02d}")
                         
                         logger.info(f"Training step: {self.training_step_idx}")
                         logger.info(f"Environment step: {self.environment_step_idx}")
@@ -328,8 +329,51 @@ class COMAMission(Mission):
         # Ensure TensorBoard data is flushed to disk
         logger.info("Training completed. Flushing TensorBoard data...")
         self.writer.flush()
-        self.writer.close()
         logger.info("TensorBoard data saved successfully.")
+        
+        # 在训练完成时强制保存最终的航线可视化
+        logger.info("💾 Saving final trajectory visualization...")
+        try:
+            # 运行一个最终的评估episode来保存航线
+            final_episode = EpisodeGenerator(
+                self.params, self.writer, self.grid_map, self.sensor
+            )
+            (
+                final_episode_return,
+                final_episode_rewards,
+                final_absolute_return,
+                final_simulated_map,
+                batch_memory,
+                final_agent_positions,
+                final_t_collision,
+                _,
+                final_agent_actions,
+                final_agent_altitudes,
+            ) = final_episode.execute(
+                self.training_step_idx,  # Use final training step as episode number
+                batch_memory,
+                self.coma_wrapper,
+                "eval",  # Use eval mode
+                self.training_step_idx,
+            )
+            
+            # 保存最终航线图
+            plot_trajectories(
+                final_agent_positions,
+                self.n_agents,
+                self.writer,
+                self.training_step_idx,
+                final_t_collision,
+                self.budget,
+                final_simulated_map,
+                obstacles=self.obstacles,
+            )
+            logger.info(f"✅ Final trajectory saved at step {self.training_step_idx}")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to save final trajectory: {e}")
+        
+        # Close TensorBoard writer
+        self.writer.close()
         
         # Save training results to res/ folder
         self.save_training_results()
@@ -867,7 +911,10 @@ class COMAMission(Mission):
             "timestamp": timestamp,
             "current_training_step": self.training_step_idx,
             "total_training_steps": self.total_training_steps,
-            "progress_percentage": round((self.training_step_idx / self.total_training_steps) * 100, 2),
+            "progress_percentage": round((self.training_step_idx / self.total_training_steps) * 100, 2) if self.total_training_steps > 0 else 0,
+            "current_episode": len(self.episode_returns),
+            "target_episodes": self.num_episodes,
+            "episode_progress_percentage": round((len(self.episode_returns) / self.num_episodes) * 100, 2) if self.num_episodes > 0 else 0,
             "current_max_return": float(self.max_mean_episode_return),
             "total_episodes": len(self.episode_returns),
             "latest_episode_returns": [float(r) for r in self.episode_returns[-10:]] if self.episode_returns else [],
@@ -902,7 +949,7 @@ class COMAMission(Mission):
                         datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     ])
         
-        logger.info(f"📊 Training progress saved: {self.training_step_idx}/{self.total_training_steps} steps ({progress_summary['progress_percentage']}%)")
+        logger.info(f"📊 Training progress saved: Episode {len(self.episode_returns)}/{self.num_episodes} ({progress_summary['episode_progress_percentage']}%), Training step {self.training_step_idx}/{self.total_training_steps}")
 
     def mark_training_completed(self):
         """标记训练完成状态"""
