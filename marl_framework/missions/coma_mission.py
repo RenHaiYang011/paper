@@ -172,10 +172,19 @@ class COMAMission(Mission):
         chosen_altitudes = []
 
         logger.info("🔄 Starting training loop...")
-        for episode_idx in range(
-            1,
-            self.total_training_steps + 1,
-        ):
+        # 使用足够多的episodes来达到目标training steps
+        # 计算需要的episodes: 为了安全起见,多生成50%的episodes
+        max_episodes_needed = int(self.total_training_steps * (self.budget + 1) * self.n_agents / (self.batch_size * self.batch_number) * 1.5)
+        logger.info(f"📊 Will generate up to {max_episodes_needed} episodes to reach {self.total_training_steps} training steps")
+        
+        episode_counter = 0
+        for episode_idx in range(1, max_episodes_needed + 1):
+            # 如果已经达到目标training steps,停止生成新episodes
+            if self.training_step_idx >= self.total_training_steps:
+                logger.info(f"🎯 Reached target training steps ({self.total_training_steps}), stopping episode generation")
+                break
+            
+            episode_counter += 1
 
             episode = EpisodeGenerator(
                 self.params, self.writer, self.grid_map, self.sensor
@@ -229,7 +238,7 @@ class COMAMission(Mission):
                         eta_s = int(eta_seconds % 60)
                         
                         if self.training_step_idx % 10 == 0:  # 每10步打印一次,避免刷屏
-                            print(f"📊 Training Step: {self.training_step_idx}/{self.total_training_steps} | Episode: {len(self.episode_returns)}/{self.num_episodes} | ETA: {eta_h:02d}:{eta_m:02d}:{eta_s:02d}")
+                            print(f"📊 Training Step: {self.training_step_idx}/{self.total_training_steps} | Episode: {episode_counter} | ETA: {eta_h:02d}:{eta_m:02d}:{eta_s:02d}")
                         
                         logger.info(f"Training step: {self.training_step_idx}")
                         logger.info(f"Environment step: {self.environment_step_idx}")
@@ -949,7 +958,7 @@ class COMAMission(Mission):
                         datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     ])
         
-        logger.info(f"📊 Training progress saved: Episode {len(self.episode_returns)}/{self.num_episodes} ({progress_summary['episode_progress_percentage']}%), Training step {self.training_step_idx}/{self.total_training_steps}")
+        logger.info(f"📊 Training progress saved: Training step {self.training_step_idx}/{self.total_training_steps} ({progress_summary['progress_percentage']}%), Episodes collected: {len(self.episode_returns)}")
 
     def mark_training_completed(self):
         """标记训练完成状态"""
