@@ -136,14 +136,14 @@ experiment:
   altitude_diversity_weight: 0.5  # 高度多样性奖励权重: 鼓励agents在不同高度探索
   
   # ==================== 能耗惩罚 ====================
-  energy_cost_per_step: 0.1       # 每步固定能耗惩罚，鼓励高效完成任务
+  energy_cost_per_step: 0.05      # 降低能耗惩罚(从0.1降到0.05),减少压力
   
   # ==================== 障碍物避障配置 ====================
   obstacles:
     enable: true                    # 启用障碍物避障功能
-    safety_margin: 0.8              # 减小安全边界(从1.0降到0.8),更贴近障碍物
-    collision_penalty: 10.0         # 大幅降低碰撞惩罚(从20降到10),减少恐惧
-    obstacle_penalty_weight: 0.3    # 进一步降低距离惩罚(从0.5降到0.3)
+    safety_margin: 0.5              # 大幅减小安全边界(从0.8降到0.5)
+    collision_penalty: 5.0          # 大幅降低碰撞惩罚(从10降到5)
+    obstacle_penalty_weight: 0.1    # 极度降低距离惩罚(从0.3降到0.1)
     
     # 固定障碍物列表 - 与visualization.obstacles对应
     # 这些障碍物会影响UAV的路径规划和动作选择
@@ -248,19 +248,19 @@ experiment:
     communication_cost: 0.01
   
   # ==================== 新设计3: 目标发现奖励机制 ==================== 
-  target_discovery_reward: 50.0     # 首次发现目标的巨大正奖励
-  mission_success_reward: 100.0     # 任务成功完成奖励
-  mission_failure_penalty: -50.0    # 任务失败惩罚
-  collaborative_discovery_weight: 25.0  # 协同发现奖励权重
-  discovery_threshold: 0.8           # 目标发现的置信度阈值
+  target_discovery_reward: 100.0    # 大幅增加发现奖励(从50提高到100)
+  mission_success_reward: 200.0     # 大幅增加成功奖励(从100提高到200)
+  mission_failure_penalty: -20.0    # 降低失败惩罚(从-50到-20)
+  collaborative_discovery_weight: 50.0  # 增加协同发现奖励(从25提高到50)
+  discovery_threshold: 0.8          # 保持发现阈值
   
   # ==================== 新设计4: 区域搜索奖励 ==================== 
-  region_coverage_weight: 3.0       # 大幅增强区域覆盖奖励(从2.0提高到3.0)
-  region_priority_weight: 3.0       # 大幅增强优先级奖励(从2.0提高到3.0)
-  search_density_weight: 1.0        # 增强搜索密度奖励(从0.6提高到1.0)
-  search_completion_weight: 2.0     # 增强完成奖励(从1.5提高到2.0)
-  redundant_search_penalty: -0.5    # 降低冗余惩罚(从-0.8到-0.5),允许重复访问
-  region_transition_penalty: -0.2   # 降低转换惩罚(从-0.3到-0.2)
+  region_coverage_weight: 5.0       # 巨幅增强区域覆盖奖励(从3.0提高到5.0)
+  region_priority_weight: 5.0       # 巨幅增强优先级奖励(从3.0提高到5.0)
+  search_density_weight: 2.0        # 大幅增强搜索密度奖励(从1.0提高到2.0)
+  search_completion_weight: 3.0     # 增强完成奖励(从2.0提高到3.0)
+  redundant_search_penalty: -0.2    # 大幅降低冗余惩罚(从-0.5到-0.2)
+  region_transition_penalty: -0.1   # 降低转换惩罚(从-0.2到-0.1)
   
   baselines:
     lawnmower:
