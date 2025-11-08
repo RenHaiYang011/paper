@@ -105,7 +105,7 @@ experiment:
     spacing: 5       # 必须为整数，以优化计算
     min_altitude: 5
     max_altitude: 25
-    budget: 25                # 增加到25步,允许更长的航线探索
+    budget: 35               # 增加到35步，支持更复杂的搜索路径
     num_actions: 6
   uav:
     max_v: 5
@@ -136,7 +136,7 @@ experiment:
   altitude_diversity_weight: 0.5  # 高度多样性奖励权重: 鼓励agents在不同高度探索
   
   # ==================== 能耗惩罚 ====================
-  energy_cost_per_step: 0.05      # 降低能耗惩罚(从0.1降到0.05),减少压力
+  energy_cost_per_step: 0.04      # 进一步降低能耗惩罚(从0.05降到0.04),配合更长航线
   
   # ==================== 障碍物避障配置 ====================
   obstacles:
