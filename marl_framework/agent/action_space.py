@@ -597,19 +597,22 @@ class AgentActionSpace:
         
         Args:
             position: 当前位置 [x, y, z]
-            mask: 当前动作掩码
+            mask: 当前动作掩码（一维数组）
             agent_state_space: 智能体状态空间
             
         Returns:
-            更新后的动作掩码
+            更新后的动作掩码（一维数组）
         """
         if self.obstacle_manager is None or not self.obstacle_manager.enabled:
             return mask
         
+        # 确保mask是一维数组
+        mask_1d = mask.flatten() if mask.ndim > 1 else mask
+        
         # 获取所有可能的下一步位置
         possible_next_positions = []
         for action in range(self.num_actions):
-            next_pos = self.action_to_position(position, action)
+            next_pos = self.action_to_position(np.copy(position), action)
             possible_next_positions.append(next_pos)
         
         # 获取安全动作掩码
@@ -617,8 +620,19 @@ class AgentActionSpace:
             position, possible_next_positions
         )
         
+        # 确保obstacle_mask也是一维数组且长度匹配
+        if obstacle_mask.ndim > 1:
+            obstacle_mask = obstacle_mask.flatten()
+        
+        # 确保两个掩码长度相同
+        if len(mask_1d) != len(obstacle_mask):
+            logger.error(f"Mask shape mismatch: mask_1d={mask_1d.shape}, obstacle_mask={obstacle_mask.shape}")
+            logger.error(f"num_actions={self.num_actions}, position={position}")
+            # 返回原始掩码，不应用障碍物掩码
+            return mask_1d
+        
         # 合并掩码（两个掩码都为1时才为1）
-        combined_mask = mask * obstacle_mask
+        combined_mask = mask_1d * obstacle_mask
         
         # 如果所有动作都被屏蔽，选择"最不坏"的动作（离障碍物最远的）
         if np.sum(combined_mask) == 0:
@@ -626,10 +640,10 @@ class AgentActionSpace:
                           f"choosing least bad action (farthest from obstacles)")
             
             # 计算每个有效动作到最近障碍物的距离
-            valid_actions = np.where(mask == 1)[0]
+            valid_actions = np.where(mask_1d == 1)[0]
             if len(valid_actions) == 0:
                 # 如果原始掩码就是空的，返回原掩码
-                return mask
+                return mask_1d
             
             max_min_distance = -1
             best_action = None
@@ -645,13 +659,13 @@ class AgentActionSpace:
             
             # 创建新掩码，只允许"最不坏"的动作
             if best_action is not None:
-                escape_mask = np.zeros_like(mask)
+                escape_mask = np.zeros_like(mask_1d)
                 escape_mask[best_action] = 1
                 logger.info(f"Escape action {best_action} selected with distance {max_min_distance:.2f}m from nearest obstacle")
                 return escape_mask
             else:
                 # 理论上不应该到这里，但保险起见
                 logger.warning(f"Could not find escape action, keeping original mask")
-                return mask
+                return mask_1d
         
         return combined_mask
