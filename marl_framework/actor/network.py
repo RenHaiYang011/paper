@@ -56,10 +56,16 @@ class ActorNetwork(nn.Module):
         # Create a dummy input and forward through convs to infer output size
         with torch.no_grad():
             dummy = torch.zeros(1, self.input_channels, pix_y, pix_x)
-            dummy = self.activation(self.conv1(dummy))
-            dummy = self.activation(self.conv2(dummy))
-            dummy = self.activation(self.conv3(dummy))
-            conv_out_dim = int(self.flatten(dummy).shape[1])
+            dummy_out = self.activation(self.conv1(dummy))
+            dummy_out = self.activation(self.conv2(dummy_out))
+            dummy_out = self.activation(self.conv3(dummy_out))
+            flattened = self.flatten(dummy_out)
+            conv_out_dim = int(flattened.shape[1])
+            
+        logger.info(f"Actor network conv output dimension: {conv_out_dim}")
+        logger.info(f"  Input: {self.input_channels} x {pix_y} x {pix_x}")
+        logger.info(f"  After conv layers: {dummy_out.shape}")
+        logger.info(f"  After flatten: {flattened.shape}")
 
         # Fully connected layers: input matches conv_out_dim
         self.fc1 = nn.Linear(conv_out_dim, self.hidden_dim)
@@ -111,11 +117,24 @@ class ActorNetwork(nn.Module):
         elif input_state.dim() == 4:
             input_state = torch.permute(input_state, (0, 3, 1, 2))
 
+        # Debug: print input shape on first forward pass
+        if not hasattr(self, '_first_forward_done'):
+            logger.info(f"Actor forward - Input shape: {input_state.shape}")
+            self._first_forward_done = True
+
         output = self.activation(self.conv1(input_state))
         output = self.activation(self.conv2(output))
         output = self.activation(self.conv3(output))
         # output = self.activation(self.conv4(output))
         h = self.flatten(output)
+        
+        # Debug: print flattened shape if mismatch detected
+        if h.shape[1] != self.fc1.in_features:
+            logger.error(f"Shape mismatch detected!")
+            logger.error(f"  Flattened output: {h.shape}")
+            logger.error(f"  fc1 expects: {self.fc1.in_features}")
+            logger.error(f"  Conv output before flatten: {output.shape}")
+        
         output = self.activation(self.fc1(h))
         # output = self.activation(self.fc2(output))
         output = self.fc3(output)

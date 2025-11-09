@@ -62,10 +62,16 @@ class CriticNetwork(nn.Module):
         # Create a dummy input and forward through convs to infer output size
         with torch.no_grad():
             dummy = torch.zeros(1, self.input_channels, pix_y, pix_x)
-            dummy = self.activation(self.conv1(dummy))
-            dummy = self.activation(self.conv2(dummy))
-            dummy = self.activation(self.conv3(dummy))
-            conv_out_dim = int(self.flatten(dummy).shape[1])
+            dummy_out = self.activation(self.conv1(dummy))
+            dummy_out = self.activation(self.conv2(dummy_out))
+            dummy_out = self.activation(self.conv3(dummy_out))
+            flattened = self.flatten(dummy_out)
+            conv_out_dim = int(flattened.shape[1])
+            
+        logger.info(f"Critic network conv output dimension: {conv_out_dim}")
+        logger.info(f"  Input: {self.input_channels} x {pix_y} x {pix_x}")
+        logger.info(f"  After conv layers: {dummy_out.shape}")
+        logger.info(f"  After flatten: {flattened.shape}")
 
         self.fc1 = nn.Linear(conv_out_dim, 256)
         self.fc2 = nn.Linear(256, 256)
