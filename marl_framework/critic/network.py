@@ -51,7 +51,23 @@ class CriticNetwork(nn.Module):
         # self.conv4 = nn.Conv2d(128, 256, (3, 3))
         self.flatten = nn.Flatten()
         self.activation = torch.nn.ReLU()
-        self.fc1 = nn.Linear(256, 256)
+        
+        # Compute flattened conv output size dynamically
+        try:
+            pix_x = int(self.params.get("sensor", {}).get("pixel", {}).get("number_x", 57))
+            pix_y = int(self.params.get("sensor", {}).get("pixel", {}).get("number_y", 57))
+        except Exception:
+            pix_x, pix_y = 57, 57
+
+        # Create a dummy input and forward through convs to infer output size
+        with torch.no_grad():
+            dummy = torch.zeros(1, self.input_channels, pix_y, pix_x)
+            dummy = self.activation(self.conv1(dummy))
+            dummy = self.activation(self.conv2(dummy))
+            dummy = self.activation(self.conv3(dummy))
+            conv_out_dim = int(self.flatten(dummy).shape[1])
+
+        self.fc1 = nn.Linear(conv_out_dim, 256)
         self.fc2 = nn.Linear(256, 256)
         self.fc3 = nn.Linear(256, self.n_actions)
         self.log_softmax = nn.LogSoftmax(dim=0)
