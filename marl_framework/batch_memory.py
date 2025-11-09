@@ -153,6 +153,10 @@ class BatchMemory:
                                 target_q_values, _ = target_critic_network.forward(
                                     self.get(t + n, agent_id, "state").to(constants.DEVICE)
                                 )
+                                # Ensure target_q_values is 1D (squeeze batch dimension if present)
+                                if target_q_values.dim() == 2:
+                                    target_q_values = target_q_values.squeeze(0)
+                                
                                 # Ensure action index is an integer, then pick scalar q-value
                                 action_idx = self.get(t + n, agent_id, "action")
                                 if torch.is_tensor(action_idx):

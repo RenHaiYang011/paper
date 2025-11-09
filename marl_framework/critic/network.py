@@ -93,16 +93,42 @@ class CriticNetwork(nn.Module):
         elif input_state.dim() == 4:
             input_state = torch.permute(input_state, (0, 3, 1, 2))
 
+        # Debug: print input shape on first forward pass
+        if not hasattr(self, '_first_forward_done'):
+            logger.info(f"Critic forward - Input shape: {input_state.shape}")
+            self._first_forward_done = True
+
         output = self.activation(self.conv1(input_state))
         output = self.activation(self.conv2(output))
         output = self.activation(self.conv3(output))
         # output = self.activation(self.conv4(output))
-        h = torch.squeeze(self.flatten(output))
+        
+        # Flatten but preserve batch dimension
+        h = self.flatten(output)
+        
+        # Debug: print shape if mismatch detected
+        if h.dim() > 1 and h.shape[1] != self.fc1.in_features:
+            logger.error(f"Critic shape mismatch detected!")
+            logger.error(f"  Conv output before flatten: {output.shape}")
+            logger.error(f"  Flattened output: {h.shape}")
+            logger.error(f"  fc1 expects input dim: {self.fc1.in_features}")
+            logger.error(f"  fc1 weight shape: {self.fc1.weight.shape}")
+        elif h.dim() == 1 and h.shape[0] != self.fc1.in_features:
+            logger.error(f"Critic shape mismatch (1D tensor)!")
+            logger.error(f"  Flattened output: {h.shape}")
+            logger.error(f"  fc1 expects: {self.fc1.in_features}")
+        
+        # Don't squeeze - keep batch dimension
         output = self.activation(self.fc1(h))
         # output = self.activation(self.fc2(output))
         output = self.fc3(output)
 
         with torch.no_grad():
-            log_probs = self.log_softmax(output)
+            # Squeeze for log_softmax only if needed (removes batch dim for single sample)
+            if output.dim() == 2 and output.shape[0] == 1:
+                log_probs = self.log_softmax(output.squeeze(0))
+            else:
+                # For batch processing, apply along action dimension
+                log_probs = torch.nn.functional.log_softmax(output, dim=-1)
 
         return output, log_probs
