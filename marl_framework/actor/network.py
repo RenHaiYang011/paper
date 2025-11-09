@@ -44,9 +44,27 @@ class ActorNetwork(nn.Module):
         self.activation = torch.nn.ReLU()
         self.flatten = nn.Flatten()
 
-        self.fc1 = nn.Linear(256, 256)
-        self.fc2 = nn.Linear(256, 256)
-        self.fc3 = nn.Linear(256, self.n_actions)
+        # Compute flattened conv output size dynamically so linear layer matches
+        # the runtime feature map size. Use sensor pixel dims from params when
+        # available, otherwise fall back to sensible defaults.
+        try:
+            pix_x = int(self.params.get("sensor", {}).get("pixel", {}).get("number_x", 57))
+            pix_y = int(self.params.get("sensor", {}).get("pixel", {}).get("number_y", 57))
+        except Exception:
+            pix_x, pix_y = 57, 57
+
+        # Create a dummy input and forward through convs to infer output size
+        with torch.no_grad():
+            dummy = torch.zeros(1, self.input_channels, pix_y, pix_x)
+            dummy = self.activation(self.conv1(dummy))
+            dummy = self.activation(self.conv2(dummy))
+            dummy = self.activation(self.conv3(dummy))
+            conv_out_dim = int(self.flatten(dummy).shape[1])
+
+        # Fully connected layers: input matches conv_out_dim
+        self.fc1 = nn.Linear(conv_out_dim, self.hidden_dim)
+        self.fc2 = nn.Linear(self.hidden_dim, self.hidden_dim)
+        self.fc3 = nn.Linear(self.hidden_dim, self.n_actions)
 
         self.softmax = nn.Softmax(dim=1)
         self.log_softmax = nn.LogSoftmax(dim=1)

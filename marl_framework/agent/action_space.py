@@ -26,175 +26,35 @@ class AgentActionSpace:
         self.obstacle_manager = obstacle_manager
 
     def get_action_mask(self, position):
+        # General and robust approach: build a 1-D mask of length `num_actions`
+        # by checking for each action whether the resulting next position is
+        # within bounds. This avoids depending on space_z_dim shape assumptions.
+        mask_flatten = np.ones(self.num_actions, dtype=int)
 
-        if self.num_actions == 4:
-            mask = np.ones(4)
-            if position[0] == 0 and position[1] == 0:
-                mask = np.array([0, 0, 1, 1])
-            if position[0] == 0 and 0 < position[1] < self.environment_y_dim:
-                mask = np.array([0, 1, 1, 1])
-            if position[0] == 0 and position[1] == self.environment_y_dim:
-                mask = np.array([0, 1, 0, 1])
-            if (
-                0 < position[0] < self.environment_x_dim
-                and position[1] == self.environment_y_dim
-            ):
-                mask = np.array([1, 1, 0, 1])
-            if (
-                position[0] == self.environment_x_dim
-                and position[1] == self.environment_y_dim
-            ):
-                mask = np.array([1, 1, 0, 0])
-            if (
-                position[0] == self.environment_x_dim
-                and 0 < position[1] < self.environment_y_dim
-            ):
-                mask = np.array([1, 1, 1, 0])
-            if position[0] == self.environment_x_dim and position[1] == 0:
-                mask = np.array([1, 0, 1, 0])
-            if (0 < position[0] < self.environment_x_dim) and (position[1]) == 0:
-                mask = np.array([1, 0, 1, 1])
-            mask_flatten = mask
+        # For each action, compute the next position and mark invalid actions
+        # (moving out of bounds) as 0.
+        for a in range(self.num_actions):
+            next_pos = self.action_to_position(np.copy(position), a)
+            x_ok = 0 <= next_pos[0] <= self.environment_x_dim
+            y_ok = 0 <= next_pos[1] <= self.environment_y_dim
+            z_ok = self.min_altitude <= next_pos[2] <= self.max_altitude
+            if not (x_ok and y_ok and z_ok):
+                mask_flatten[a] = 0
 
-        elif self.num_actions == 6:
-            mask = np.ones(6)
-            if position[2] == self.max_altitude:
-                mask[0] = 0
-            if position[2] == self.min_altitude:
-                mask[5] = 0
-            if position[1] == 0:
-                mask[2] = 0
-            if position[1] == self.environment_y_dim:
-                mask[3] = 0
-            if position[0] == 0:
-                mask[1] = 0
-            if position[0] == self.environment_x_dim:
-                mask[4] = 0
-            mask_flatten = mask
-
-        elif self.num_actions == 9:
-            mask = np.squeeze(
-                np.ones((self.space_x_dim, self.space_y_dim, self.space_z_dim))
-            )
-            mask[1, 1] = 0
-            if position[0] == 0 and position[1] == 0:
-                mask = np.array([[0, 0, 0], [0, 0, 1], [0, 1, 1]])
-            if position[0] == 0 and 0 < position[1] < self.environment_y_dim:
-                mask = np.array([[0, 0, 0], [1, 0, 1], [1, 1, 1]])
-            if position[0] == 0 and position[1] == self.environment_y_dim:
-                mask = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0]])
-            if (
-                0 < position[0] < self.environment_x_dim
-                and position[1] == self.environment_y_dim
-            ):
-                mask = np.array([[1, 1, 0], [1, 0, 0], [1, 1, 0]])
-            if (
-                position[0] == self.environment_x_dim
-                and position[1] == self.environment_y_dim
-            ):
-                mask = np.array([[1, 1, 0], [1, 0, 0], [0, 0, 0]])
-            if (
-                position[0] == self.environment_x_dim
-                and 0 < position[1] < self.environment_y_dim
-            ):
-                mask = np.array([[1, 1, 1], [1, 0, 1], [0, 0, 0]])
-            if position[0] == self.environment_x_dim and position[1] == 0:
-                mask = np.array([[0, 1, 1], [0, 0, 1], [0, 0, 0]])
-            if (0 < position[0] < self.environment_x_dim) and (position[1] == 0):
-                mask = np.array([[0, 1, 1], [0, 0, 1], [0, 1, 1]])
-
-            mask_flatten = mask.flatten()
-
+        # Enforce "no-op" action masking if the mapping expects it (maintain
+        # previous behavior: index 4 for 9-actions, index 13 for 27-actions)
+        if self.num_actions == 9:
+            if len(mask_flatten) >= 5:
+                mask_flatten[4] = 0
+            # Provide a 2D view for compatibility
+            mask = mask_flatten.reshape((3, 3))
         elif self.num_actions == 27:
-            mask = np.squeeze(
-                np.ones((self.space_x_dim, self.space_y_dim, self.space_z_dim))
-            )
-
-            if position[0] == 0 and position[1] == 0:
-                mask = np.array(
-                    [
-                        [[0, 0, 0], [0, 1, 1], [0, 1, 1]],
-                        [[0, 0, 0], [0, 1, 1], [0, 1, 1]],
-                        [[0, 0, 0], [0, 1, 1], [0, 1, 1]],
-                    ]
-                )
-            if position[0] == 0 and 0 < position[1] < self.environment_y_dim:
-                mask = np.array(
-                    [
-                        [[0, 0, 0], [1, 1, 1], [1, 1, 1]],
-                        [[0, 0, 0], [1, 1, 1], [1, 1, 1]],
-                        [[0, 0, 0], [1, 1, 1], [1, 1, 1]],
-                    ]
-                )
-            if position[0] == 0 and position[1] == self.environment_y_dim:
-                mask = np.array(
-                    [
-                        [[0, 0, 0], [1, 1, 0], [1, 1, 0]],
-                        [[0, 0, 0], [1, 1, 0], [1, 1, 0]],
-                        [[0, 0, 0], [1, 1, 0], [1, 1, 0]],
-                    ]
-                )
-            if (
-                0 < position[0] < self.environment_x_dim
-                and position[1] == self.environment_y_dim
-            ):
-                mask = np.array(
-                    [
-                        [[1, 1, 0], [1, 1, 0], [1, 1, 0]],
-                        [[1, 1, 0], [1, 1, 0], [1, 1, 0]],
-                        [[1, 1, 0], [1, 1, 0], [1, 1, 0]],
-                    ]
-                )
-            if (
-                position[0] == self.environment_x_dim
-                and position[1] == self.environment_y_dim
-            ):
-                mask = np.array(
-                    [
-                        [[1, 1, 0], [1, 1, 0], [0, 0, 0]],
-                        [[1, 1, 0], [1, 1, 0], [0, 0, 0]],
-                        [[1, 1, 0], [1, 1, 0], [0, 0, 0]],
-                    ]
-                )
-            if (
-                position[0] == self.environment_x_dim
-                and 0 < position[1] < self.environment_y_dim
-            ):
-                mask = np.array(
-                    [
-                        [[1, 1, 1], [1, 1, 1], [0, 0, 0]],
-                        [[1, 1, 1], [1, 1, 1], [0, 0, 0]],
-                        [[1, 1, 1], [1, 1, 1], [0, 0, 0]],
-                    ]
-                )
-            if position[0] == self.environment_x_dim and position[1] == 0:
-                mask = np.array(
-                    [
-                        [[0, 1, 1], [0, 1, 1], [0, 0, 0]],
-                        [[0, 1, 1], [0, 1, 1], [0, 0, 0]],
-                        [[0, 1, 1], [0, 1, 1], [0, 0, 0]],
-                    ]
-                )
-            if (0 < position[0] < self.environment_x_dim) and (position[1] == 0):
-                mask = np.array(
-                    [
-                        [[0, 1, 1], [0, 1, 1], [0, 1, 1]],
-                        [[0, 1, 1], [0, 1, 1], [0, 1, 1]],
-                        [[0, 1, 1], [0, 1, 1], [0, 1, 1]],
-                    ]
-                )
-
-            mask = np.transpose(mask, (1, 2, 0))
-
-            if position[2] == self.max_altitude:
-                mask[:, :, 0] = 0
-            if position[2] == self.min_altitude:
-                mask[:, :, 2] = 0
-
-            mask[1, 1, 1] = 0
-
-            mask = np.transpose(mask, (2, 0, 1))
-            mask_flatten = mask.flatten()
+            if len(mask_flatten) >= 14:
+                mask_flatten[13] = 0
+            # Provide a 3D view for compatibility (x,y,z grouping)
+            mask = mask_flatten.reshape((3, 3, 3))
+        else:
+            mask = mask_flatten
 
         return mask_flatten, mask
 
