@@ -45,17 +45,25 @@ class ActorNetwork(nn.Module):
         self.flatten = nn.Flatten()
 
         # Compute flattened conv output size dynamically so linear layer matches
-        # the runtime feature map size. Use sensor pixel dims from params when
-        # available, otherwise fall back to sensible defaults.
+        # the runtime feature map size. Use STATE SPACE dims, not sensor pixel dims!
         try:
-            pix_x = int(self.params.get("sensor", {}).get("pixel", {}).get("number_x", 57))
-            pix_y = int(self.params.get("sensor", {}).get("pixel", {}).get("number_y", 57))
-        except Exception:
-            pix_x, pix_y = 57, 57
+            # State space dimensions based on environment size and spacing
+            env_x = int(self.params.get("environment", {}).get("x_dim", 50))
+            env_y = int(self.params.get("environment", {}).get("y_dim", 50))
+            spacing = int(self.params.get("experiment", {}).get("constraints", {}).get("spacing", 5))
+            
+            # Calculate state space grid size
+            state_x = int(env_x // spacing + 1)
+            state_y = int(env_y // spacing + 1)
+            
+            logger.info(f"State space dimensions: {state_x} x {state_y} (env: {env_x}x{env_y}, spacing: {spacing})")
+        except Exception as e:
+            logger.warning(f"Could not compute state space dims: {e}, using defaults")
+            state_x, state_y = 11, 11  # Default for 50x50 env with spacing=5
 
         # Create a dummy input and forward through convs to infer output size
         with torch.no_grad():
-            dummy = torch.zeros(1, self.input_channels, pix_y, pix_x)
+            dummy = torch.zeros(1, self.input_channels, state_y, state_x)
             dummy_out = self.activation(self.conv1(dummy))
             dummy_out = self.activation(self.conv2(dummy_out))
             dummy_out = self.activation(self.conv3(dummy_out))
@@ -63,7 +71,7 @@ class ActorNetwork(nn.Module):
             conv_out_dim = int(flattened.shape[1])
             
         logger.info(f"Actor network conv output dimension: {conv_out_dim}")
-        logger.info(f"  Input: {self.input_channels} x {pix_y} x {pix_x}")
+        logger.info(f"  Input: {self.input_channels} x {state_y} x {state_x}")
         logger.info(f"  After conv layers: {dummy_out.shape}")
         logger.info(f"  After flatten: {flattened.shape}")
 
