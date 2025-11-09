@@ -88,14 +88,17 @@ class CriticNetwork(nn.Module):
         self.log_softmax = nn.LogSoftmax(dim=0)
 
     def forward(self, input_state):
+        # Handle different input dimensions
         if input_state.dim() == 3:
-            input_state = torch.permute(input_state, (2, 0, 1))
+            # 3D input (H, W, C) - add batch dimension and permute
+            input_state = torch.permute(input_state, (2, 0, 1)).unsqueeze(0)  # -> (1, C, H, W)
         elif input_state.dim() == 4:
-            input_state = torch.permute(input_state, (0, 3, 1, 2))
+            # 4D input (B, H, W, C) - just permute
+            input_state = torch.permute(input_state, (0, 3, 1, 2))  # -> (B, C, H, W)
 
         # Debug: print input shape on first forward pass
         if not hasattr(self, '_first_forward_done'):
-            logger.info(f"Critic forward - Input shape: {input_state.shape}")
+            logger.info(f"Critic forward - Input shape after permute: {input_state.shape}")
             self._first_forward_done = True
 
         output = self.activation(self.conv1(input_state))

@@ -120,14 +120,18 @@ class ActorNetwork(nn.Module):
         return action_probs, action_index_chosen, action_mask_1d, eps
 
     def forward(self, input_state, eps):
+        # Handle different input dimensions  
+        # Note: get_action_index already adds batch dim with unsqueeze, so input is usually 4D
         if input_state.dim() == 3:
-            input_state = torch.permute(input_state, (2, 0, 1))
+            # 3D input (C, H, W) - add batch dimension
+            input_state = input_state.unsqueeze(0)  # -> (1, C, H, W)
         elif input_state.dim() == 4:
+            # 4D input (B, H, W, C) - permute to (B, C, H, W)
             input_state = torch.permute(input_state, (0, 3, 1, 2))
 
         # Debug: print input shape on first forward pass
         if not hasattr(self, '_first_forward_done'):
-            logger.info(f"Actor forward - Input shape: {input_state.shape}")
+            logger.info(f"Actor forward - Input shape after handling: {input_state.shape}")
             self._first_forward_done = True
 
         output = self.activation(self.conv1(input_state))
