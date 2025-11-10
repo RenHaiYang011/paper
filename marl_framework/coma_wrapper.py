@@ -206,13 +206,31 @@ class COMAWrapper:
                     distance_weight=self.params["experiment"].get("distance_weight", 0.0),
                     footprint_weight=self.params["experiment"].get("footprint_weight", 0.0),
                     collision_weight=self.params["experiment"].get("collision_weight", 0.0),
-                    collision_distance=self.params["experiment"].get("collision_distance", 1.0),
+                    prev_positions=prev_positions,
+                    next_positions=next_positions,
                     writer=self.writer,
                     global_step=global_step,
+                    collision_distance=self.params["experiment"].get("collision_distance", 1.0),
                     class_weighting=self.class_weighting,
                     altitude_diversity_weight=self.altitude_diversity_weight,
+                    # Region search parameters
+                    search_region_manager=self.search_region_manager,
+                    region_coverage_weight=self.region_coverage_weight,
+                    region_priority_weight=self.region_priority_weight,
+                    search_density_weight=self.search_density_weight,
+                    search_completion_weight=self.search_completion_weight,
+                    redundant_search_penalty=self.redundant_search_penalty,
+                    region_transition_penalty=self.region_transition_penalty,
+                    sensor_footprint=footprints[agent_id] if len(footprints) > agent_id else None,
+                    # Frontier-based intrinsic reward
+                    frontier_manager=self.frontier_manager,
+                    spacing=self.params["experiment"]["constraints"]["spacing"],
+                    # Coordination
+                    coordination_manager=self.coordination_manager,
+                    # Obstacle avoidance
                     obstacle_manager=self.obstacle_manager,
                     obstacle_penalty_weight=self.params["experiment"].get("obstacles", {}).get("obstacle_penalty_weight", 1.0),
+                    # Energy cost
                     energy_cost_per_step=self.params["experiment"].get("energy_cost_per_step", 0.0),
                 )
                 batch_memory.insert(-1, agent_id, reward=relative_reward)
