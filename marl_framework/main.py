@@ -1,6 +1,7 @@
 import sys
 import os
 import time
+import argparse
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -11,8 +12,22 @@ from missions.mission_factories import MissionFactory
 from params import load_params
 
 def main():
+    # 解析命令行参数
+    parser = argparse.ArgumentParser(description='MARL Framework Training')
+    parser.add_argument('--config', type=str, default=None,
+                       help='Path to config file (e.g., configs/params_quick_test.yaml)')
+    args = parser.parse_args()
+    
+    # 确定使用哪个配置文件
+    if args.config:
+        config_path = args.config
+        print(f"🎯 Using config from command line: {config_path}")
+    else:
+        config_path = constants.CONFIG_FILE_PATH
+        print(f"📋 Using default config: {config_path}")
+    
     # 首先加载参数和设置路径
-    params = load_params(constants.CONFIG_FILE_PATH)
+    params = load_params(config_path)
     
     # Setup paths based on configuration
     constants.setup_paths(params)

@@ -1,0 +1,346 @@
+# 🚀 超快速验证配置 - Quick Test Mode
+# 使用方法: python main.py --config configs/params_quick_test.yaml
+# 
+# 🎯 目标: 1-2小时内验证所有核心功能
+# 📊 策略: 极简参数 + 完整功能
+# ✅ 验证内容:
+#   - 多层级奖励计算 ✓
+#   - 前沿驱动探索 ✓
+#   - 协同机制 ✓
+#   - 区域搜索 ✓
+#   - 障碍物避障 ✓
+#   - 目标发现 ✓
+#
+# ⚡ 极速设置:
+# - Episodes: 100 (vs 标准1500)
+# - Budget: 30 (vs 标准50)
+# - Batch: 16 (vs 标准128)
+# - Agents: 2 (vs 标准4)
+# - 预计时间: 1-2小时
+# - 验证目的: 功能测试，非性能优化
+
+# ==================== 路径配置 ====================
+paths:
+  log_dir: "log"
+  results_dir: "res"
+
+environment:
+  num_envs: 1              # 减少环境数量
+  seed: 3
+  x_dim: 50                # 保持50x50地图
+  y_dim: 50
+
+sensor:
+  type: "rgb_camera"
+  field_of_view:
+    angle_x: 60
+    angle_y: 60
+  pixel:
+    number_x: 57
+    number_y: 57
+  encoding: "rgb8"
+  model:
+    type: "altitude_dependent"
+    coeff_a: 0.05
+    coeff_b: 0.2
+  simulation:
+    type: "random_field"
+    cluster_radius: 5
+    map_type: "region_based"
+
+mapping:
+  prior: 0.5
+
+# ==================== 搜索区域定义 (简化为2个区域) ====================
+search_regions:
+  regions:
+    - name: "high_priority_zone"
+      type: "rectangle"
+      priority: 1.0
+      min_coverage: 0.85          # 降低要求
+      coordinates: [[10, 10, 25, 25]]
+      search_density: "high"
+      target_probability: 0.7     # 提高目标密度，便于快速发现
+      
+    - name: "medium_priority_zone"
+      type: "rectangle"
+      priority: 0.6
+      min_coverage: 0.75          # 降低要求
+      coordinates: [[30, 10, 45, 25]]
+      search_density: "medium"
+      target_probability: 0.3
+  
+  strategy:
+    mode: "priority_based"
+    allow_overlap: false
+    revisit_threshold: 0.15       # 放宽重访限制
+    completion_threshold: 0.80    # 降低完成要求
+  
+  density_requirements:
+    high: 2                       # 降低密度要求
+    medium: 1
+    low: 1
+
+experiment:
+  title: "quick_test_validation"
+  constraints:
+    spacing: 3                    # 保持精细控制
+    min_altitude: 5
+    max_altitude: 25
+    budget: 30                    # ← 关键: 30步快速验证
+    num_actions: 27               # 保持27动作空间验证3D功能
+  uav:
+    max_v: 5
+    max_a: 2
+    sampling_time: 2
+    communication_range: 25
+    fix_range: True
+    failure_rate: 0
+  missions:
+    type: "COMA"
+    mission_mode: "training"
+    n_episodes: 100               # ← 关键: 仅100轮快速验证
+    patience: 50                  # 降低耐心值
+    n_agents: 2                   # ← 关键: 2智能体减少计算
+    action_space: "larger"
+    planning_uncertainty: "SE"
+    eps_max: 0.6                  # 提高初始探索
+    eps_min: 0.1                  # 保持较高最小探索
+    eps_anneal_phase: 3000        # 快速衰减
+    use_eps: True
+    class_weighting: [0, 1] 
+    reward_normalization: false
+  
+  # 保持核心奖励权重以验证功能
+  coverage_weight: 2.0
+  distance_weight: -0.3
+  footprint_weight: 0.0
+  collision_weight: 2.5
+  collision_distance: 5.0
+  altitude_diversity_weight: 1.5
+  
+  # ==================== 能耗惩罚 ====================
+  energy_cost_per_step: 0.01      # 降低能耗惩罚，鼓励探索
+  
+  # ==================== 障碍物避障配置 (简化) ====================
+  obstacles:
+    enable: true
+    safety_margin: 1.2
+    collision_penalty: 6.0
+    obstacle_penalty_weight: 0.4
+    
+    # 只保留5个关键障碍物用于功能验证
+    fixed_obstacles:
+      - x: 15.0
+        y: 20.0
+        z: 0.0
+        height: 12.0
+        radius: 2.5
+      
+      - x: 35.0
+        y: 15.0
+        z: 0.0
+        height: 15.0
+        radius: 2.5
+      
+      - x: 22.0
+        y: 18.0
+        z: 0.0
+        height: 10.0
+        radius: 2.5
+      
+      - x: 38.0
+        y: 20.0
+        z: 0.0
+        height: 11.0
+        radius: 2.5
+      
+      - x: 28.0
+        y: 22.0
+        z: 0.0
+        height: 9.0
+        radius: 2.5
+  
+  # ==================== 内在奖励机制 (保持以验证功能) ====================
+  intrinsic_rewards:
+    enable: true
+    frontier_reward_weight: 4.0
+    frontier_detection_threshold: 0.3
+    coverage_exploration_weight: 3.0
+    coverage_decay_factor: 0.90
+    completeness_weight: 0.8
+    confidence_threshold: 0.8
+  
+  # ==================== 协同机制 (保持以验证功能) ====================
+  coordination:
+    enable: true
+    overlap_penalty_weight: 1.5
+    overlap_threshold: 0.25
+    division_reward_weight: 1.5
+    region_assignment_bonus: 1.5
+    joint_discovery_weight: 2.5
+    collaboration_distance: 20.0
+    communication_cost: 0.005
+  
+  # ==================== 目标发现奖励 (提高以加快验证) ====================
+  target_discovery_reward: 150.0    # 提高发现奖励
+  mission_success_reward: 250.0     # 提高成功奖励
+  mission_failure_penalty: -15.0    # 降低失败惩罚
+  collaborative_discovery_weight: 60.0
+  discovery_threshold: 0.75         # 降低发现阈值
+  
+  # ==================== 区域搜索奖励 (保持以验证) ====================
+  region_coverage_weight: 8.0
+  region_priority_weight: 8.0
+  search_density_weight: 4.0
+  search_completion_weight: 6.0
+  redundant_search_penalty: -0.03
+  region_transition_penalty: -0.01
+  
+  baselines:
+    lawnmower:
+      trials: 10                   # 减少基线测试
+      altitude: 5
+    random:
+      n_episodes: 10
+    information_gain:
+      trials: 10
+      communication: true
+
+# ==================== 搜索专用状态表示 (保持完整) ====================
+state_representation:
+  use_discovery_history: true
+  discovery_influence_radius: 2
+  use_exploration_intensity: true
+  exploration_decay_factor: 0.9
+  use_target_probability: true
+  use_confidence_map: true
+  confidence_update_rate: 0.1
+  use_frontier_map: true
+  frontier_kernel_size: 3
+  use_joint_prospect: true
+  prospect_fusion_method: "max"
+
+evaluation:
+  repetitions: 1
+  metrics:
+    - "num_waypoints"
+    - "paths"
+    - "rmse"
+    - "wrmse"
+    - "mll" 
+    - "wmll"
+    - "run_time"
+    - "target_discovery_rate"
+    - "search_efficiency"
+    - "collaboration_index"
+    - "region_completion_rate"
+
+networks:
+  device: "cuda"
+  type: "CNN"
+  data_passes: 1                   # ← 关键: 仅1次数据遍历
+  batch_size: 16                   # ← 关键: 最小batch size
+  batch_number: 2                  # ← 关键: 最少batch数
+  copy_rate: 20                    # 降低复制频率
+  gamma: 0.99
+  lambda: 0.8
+  actor:
+    hidden_dim: 128                # 保持网络容量
+    learning_rate: 0.0001          # 提高学习率加快收敛
+    momentum: 0.9
+    gradient_norm: 10
+  critic:
+    target_update_mode: "hard"
+    tau: 0.01
+    update_mode: "random_batches"
+    synchronization: "no"
+    fc1_dim: 64
+    learning_rate: 0.0005          # 提高学习率
+    momentum: 0.9
+    gradient_norm: 10
+
+classification:
+  n_episodes: 50                   # 减少分类训练
+  data_split: [0.4, 0.4, 0.2]
+  number_epochs: 50                # 减少epoch
+  batch_size: 32
+
+# ==================== 可视化配置 ====================
+visualization:
+  obstacles:
+    - x: 15
+      y: 20
+      z: 0
+      height: 12
+    
+    - x: 35
+      y: 15
+      z: 0
+      height: 15
+    
+    - x: 22
+      y: 18
+      z: 0
+      height: 10
+    
+    - x: 38
+      y: 20
+      z: 0
+      height: 11
+    
+    - x: 28
+      y: 22
+      z: 0
+      height: 9
+
+# ==================== 配置说明 ====================
+# 
+# 🎯 超快速验证策略:
+# 
+# 1. 减少计算量:
+#    ✓ Episodes: 100 (vs 1500标准)
+#    ✓ Budget: 30步 (vs 50标准)  
+#    ✓ Agents: 2个 (vs 4标准)
+#    ✓ Batch: 16 (vs 128标准)
+#    ✓ Data passes: 1 (vs 5标准)
+#    ✓ 区域: 2个 (vs 3标准)
+#    ✓ 障碍物: 5个 (vs 10标准)
+#
+# 2. 保持完整功能:
+#    ✅ 多层级奖励 - 全部保留
+#    ✅ 前沿探索 - 完整实现
+#    ✅ 协同机制 - 三重设计
+#    ✅ 区域搜索 - 优先级管理
+#    ✅ 障碍物避障 - 完整逻辑
+#    ✅ 13通道观测 - 完整状态
+#
+# 3. 优化快速收敛:
+#    ✓ 提高学习率 (0.0001 actor, 0.0005 critic)
+#    ✓ 提高奖励强度 (150.0目标发现)
+#    ✓ 降低阈值 (0.75发现, 0.80完成)
+#    ✓ 提高探索率 (0.6 max, 0.1 min)
+#    ✓ 提高目标密度 (0.7高优先级区域)
+#
+# 预期效果:
+# - 总训练步数: ~1,500步 (100 episodes × 30 budget / 2)
+# - 预计时间: 1-2小时
+# - GPU利用率: 15-30%
+# - 功能验证: ✅ 100%覆盖所有创新点
+# - 性能表现: 60-70% (仅用于功能验证)
+#
+# 🔍 验证重点:
+# 1. 多层级奖励是否正常计算
+# 2. 前沿探索是否引导智能体
+# 3. 协同机制是否避免重叠
+# 4. 区域优先级是否生效
+# 5. 障碍物避障是否工作
+# 6. 目标发现是否触发奖励
+# 7. 网络是否正常收敛
+# 8. 可视化是否正确显示
+#
+# 💡 使用建议:
+# - 先用此配置验证所有功能正常
+# - 确认无bug后再用params.yaml完整训练
+# - 可用于快速调试和参数测试
+# - 适合演示和功能展示
