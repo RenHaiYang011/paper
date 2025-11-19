@@ -117,14 +117,14 @@ experiment:
   missions:
     type: "COMA"
     mission_mode: "training"
-    n_episodes: 1500          # 增加训练轮数（从1000到1500）
+    n_episodes: 1200          # 增加训练轮数（从1000到1500）
     patience: 150
     n_agents: 4
     action_space: "larger"
     planning_uncertainty: "SE"
-    eps_max: 0.7             # 提高探索率（从0.5到0.7）
-    eps_min: 0.05            # 提高最小探索率（从0.02到0.05）
-    eps_anneal_phase: 12000  # 延长探索衰减（从10000到12000）
+    eps_max: 0.8             # 提高探索率（从0.7到0.8）：更多探索
+    eps_min: 0.15            # 提高最小探索率（从0.05到0.15）：保持持续探索
+    eps_anneal_phase: 50000  # 延长探索衰减（覆盖大部分训练过程）
     use_eps: True
     class_weighting: [0, 1] 
     reward_normalization: false
@@ -325,7 +325,7 @@ networks:
   lambda: 0.8
   actor:
     hidden_dim: 256        # 增大网络容量（从128到256）：学习复杂模式
-    learning_rate: 0.00005 # 降低学习率（从0.00001到0.00005）：更稳定但更快收敛
+    learning_rate: 0.0001  # 提高学习率（从0.00005到0.0001）：加快策略更新
     momentum: 0.9
     gradient_norm: 10
   critic:
@@ -334,7 +334,7 @@ networks:
     update_mode: "random_batches"
     synchronization: "no"
     fc1_dim: 128           # 增大网络容量（从64到128）
-    learning_rate: 0.0003  # 降低学习率（从0.0001到0.0003）
+    learning_rate: 0.0005  # 提高学习率（从0.0003到0.0005）：更快价值估计
     momentum: 0.9
     gradient_norm: 10
 
