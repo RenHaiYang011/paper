@@ -122,9 +122,9 @@ experiment:
     n_agents: 4
     action_space: "larger"
     planning_uncertainty: "SE"
-    eps_max: 0.8             # 提高探索率（从0.7到0.8）：更多探索
-    eps_min: 0.15            # 提高最小探索率（从0.05到0.15）：保持持续探索
-    eps_anneal_phase: 50000  # 延长探索衰减（覆盖大部分训练过程）
+    eps_max: 0.6             # ✅ 修复: 降低初始探索率（从0.8改为0.6）- 更多利用学习策略
+    eps_min: 0.05            # ✅ 修复: 降低最小探索率（从0.15改为0.05）- 标准设置
+    eps_anneal_phase: 600    # ✅ 修复: 大幅缩短探索衰减（从50000改为600）- 关键修复！让模型能真正学习
     use_eps: True
     class_weighting: [0, 1] 
     reward_normalization: false
