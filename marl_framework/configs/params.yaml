@@ -122,9 +122,11 @@ experiment:
     n_agents: 4
     action_space: "larger"
     planning_uncertainty: "SE"
-    eps_max: 0.6             # ✅ 修复: 降低初始探索率（从0.8改为0.6）- 更多利用学习策略
-    eps_min: 0.05            # ✅ 修复: 降低最小探索率（从0.15改为0.05）- 标准设置
-    eps_anneal_phase: 600    # ✅ 修复: 大幅缩短探索衰减（从50000改为600）- 关键修复！让模型能真正学习
+    eps_max: 0.3             # ✅✅ 大幅降低初始探索率（从0.8→0.6→0.3）让策略主导！
+    eps_min: 0.05            # ✅ 标准最小探索率
+    eps_anneal_phase: 100    # ✅✅ 关键修复: 在前100个EPISODES内完成探索→利用转变
+                             # 说明: num_episode是episode编号,不是training_step!
+                             # 100个episodes ≈ 40个training_steps就开始大量利用学习策略
     use_eps: True
     class_weighting: [0, 1] 
     reward_normalization: false
